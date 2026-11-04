@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Refuse commits unless the configured email is a GitHub noreply address.
+email="$(git config user.email || true)"
+case "$email" in
+  *@users.noreply.github.com) exit 0 ;;
+  *) echo "pre-commit: user.email '$email' is not a GitHub noreply address"
+     echo "fix: git config user.email <id>+<user>@users.noreply.github.com"
+     exit 1 ;;
+esac
