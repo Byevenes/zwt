@@ -1,21 +1,39 @@
 # zwt
 
-Personal CLI for git worktrees. One command creates a worktree with the right branch, the right base, and the right git identity for the folder it lives in, then checks that nothing is misconfigured.
+A small CLI for git worktrees. One command creates a worktree with the right branch, the right base, and the right git identity for the folder it lives in, then checks that nothing is misconfigured.
 
-Status: slice 1 (architecture and `zwt config check`). The backlog lives in the issues.
+Built with TypeScript + [Effect](https://effect.website), compiled with Bun to a single binary.
+
+> **Status: experimental / in development.** Only slice 1 exists today (architecture and `zwt config check`). Commands below under *Vision* are planned, not implemented. The backlog lives in the issues.
+
+## Install (from source)
+
+Requires [Bun](https://bun.sh) 1.4.2 or newer.
+
+```sh
+git clone https://github.com/Byevenes/zwt.git
+cd zwt
+bun install
+bun run build                       # dist/zwt, one executable
+```
 
 ## Usage
 
 ```sh
-bun install
-bun run build                       # dist/zwt, one executable
 ./dist/zwt --version
 ./dist/zwt config check             # $XDG_CONFIG_HOME/zwt/zwt.toml, fallback ~/.config/zwt/zwt.toml
 ./dist/zwt config check --config examples/zwt.toml
 ./dist/zwt --dry-run config check   # prints planned writes instead of running them
 ```
 
-Checks: `bun run typecheck`, `bun run test`. Design: `docs/adr/`. Effect notes in Spanish: `docs/learn/`.
+An invalid config is rejected with the offending line and a suggested fix. See `examples/zwt.toml` for a valid one.
+
+## Development
+
+- Checks: `bun run typecheck`, `bun run test`.
+- Design decisions: [`docs/adr/`](docs/adr/).
+- Learning notes on Effect (in Spanish): [`docs/learn/`](docs/learn/).
+- Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Vision
 
@@ -74,4 +92,4 @@ zwt list | zwt prune [--merged] [--dry-run]
 
 ## License
 
-All rights reserved. No license is granted yet.
+[MIT](LICENSE) © 2026 Brayan Yévenes
