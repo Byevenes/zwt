@@ -4,7 +4,7 @@ A small CLI for git worktrees. One command creates a worktree with the right bra
 
 Built with TypeScript + [Effect](https://effect.website), compiled with Bun to a single binary.
 
-> **Status: experimental / in development.** Only slice 1 exists today (architecture and `zwt config check`). Commands below under *Vision* are planned, not implemented. The backlog lives in the issues.
+> **Status: experimental / in development.** Implemented today: `zwt config check` and `zwt new <slug>`. Commands below under *Vision* are planned, not implemented. The backlog lives in the issues.
 
 ## Install (from source)
 
@@ -24,7 +24,12 @@ bun run build                       # dist/zwt, one executable
 ./dist/zwt config check             # $XDG_CONFIG_HOME/zwt/zwt.toml, fallback ~/.config/zwt/zwt.toml
 ./dist/zwt config check --config examples/zwt.toml
 ./dist/zwt --dry-run config check   # prints planned writes instead of running them
+./dist/zwt new login                # creates <prefix>login from the profile's base, under worktrees_dir
+./dist/zwt new login --base main --prefix fix/
+./dist/zwt --dry-run new login      # shows the fetch and worktree add it would run
 ```
+
+`zwt new` resolves branch prefix, base and identity as `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults (`main`, no prefix, `worktrees`). The worktree goes to `<repo parent>/<worktrees_dir>/<repo>/<slug>`. Re-running with the same slug prints the existing worktree. If no profile or project gives the repo an identity, it stops and tells you which `[[profile]]` to add.
 
 An invalid config is rejected with the offending line and a suggested fix. See `examples/zwt.toml` for a valid one.
 
