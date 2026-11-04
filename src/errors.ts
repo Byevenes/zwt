@@ -71,9 +71,47 @@ export class GitCommandFailed extends Data.TaggedError("GitCommandFailed")<{
   }
 }
 
-export type ZwtError = BranchNotFound | IdentityMismatch | ConfigInvalid | ConfigNotFound | GitCommandFailed
+export class IdentityUnresolved extends Data.TaggedError("IdentityUnresolved")<{
+  readonly repo: string
+  readonly file: string
+}> {
+  override get message() {
+    return `no git identity for ${this.repo}: no [[project]] or [[profile]] in ${this.file} matches it`
+  }
+  get fix() {
+    return `add a [[profile]] with match = "${this.repo}/**" and an identity to ${this.file}, then run: zwt config check`
+  }
+}
 
-const zwtTags = new Set<string>(["BranchNotFound", "IdentityMismatch", "ConfigInvalid", "ConfigNotFound", "GitCommandFailed"])
+export class InvalidSlug extends Data.TaggedError("InvalidSlug")<{
+  readonly slug: string
+}> {
+  override get message() {
+    return `invalid slug "${this.slug}": use letters, digits, ".", "_" or "-" (no "/" or leading ".")`
+  }
+  get fix() {
+    return `zwt new ${this.slug.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "my-task"}`
+  }
+}
+
+export type ZwtError =
+  | BranchNotFound
+  | IdentityMismatch
+  | ConfigInvalid
+  | ConfigNotFound
+  | GitCommandFailed
+  | IdentityUnresolved
+  | InvalidSlug
+
+const zwtTags = new Set<string>([
+  "BranchNotFound",
+  "IdentityMismatch",
+  "ConfigInvalid",
+  "ConfigNotFound",
+  "GitCommandFailed",
+  "IdentityUnresolved",
+  "InvalidSlug"
+])
 
 export const isZwtError = <E>(u: E): u is Extract<E, ZwtError> =>
   typeof u === "object" && u !== null && "_tag" in u && zwtTags.has(String(u._tag))
