@@ -1,0 +1,9 @@
+version = 1
+
+[identity.personal]
+name = "Jane Doe"
+email = "not-an-email"
+
+[[profile]]
+match = "~/personal/**"
+identity = "ghost"
