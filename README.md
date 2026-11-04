@@ -2,7 +2,20 @@
 
 Personal CLI for git worktrees. One command creates a worktree with the right branch, the right base, and the right git identity for the folder it lives in, then checks that nothing is misconfigured.
 
-Status: design. No code yet; the backlog lives in the issues.
+Status: slice 1 (architecture and `zwt config check`). The backlog lives in the issues.
+
+## Usage
+
+```sh
+bun install
+bun run build                       # dist/zwt, one executable
+./dist/zwt --version
+./dist/zwt config check             # $XDG_CONFIG_HOME/zwt/zwt.toml, fallback ~/.config/zwt/zwt.toml
+./dist/zwt config check --config examples/zwt.toml
+./dist/zwt --dry-run config check   # prints planned writes instead of running them
+```
+
+Checks: `bun run typecheck`, `bun run test`. Design: `docs/adr/`. Effect notes in Spanish: `docs/learn/`.
 
 ## Vision
 

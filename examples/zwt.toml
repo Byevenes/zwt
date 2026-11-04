@@ -1,0 +1,29 @@
+version = 1
+worktrees_dir = "worktrees"
+scratch_dir = ".scratch"
+
+[identity.personal]
+name = "Jane Doe"
+email = "jane@example.com"
+
+[identity.work]
+name = "Jane Doe"
+email = "jane.doe@company.example"
+
+[[profile]]
+match = "~/personal/**"
+identity = "personal"
+base_branch = "main"
+
+[[profile]]
+match = "~/work/acme/**"
+identity = "work"
+base_branch = "develop"
+branch_prefix = "feature/"
+expect_remote = "gitlab.com:acme/"
+guards = ["pre-commit", "pre-push"]
+
+[[project]]
+path = "~/work/acme/backend/api"
+base_branch = "main"
+email = "jane@acme.example"
