@@ -3,6 +3,7 @@ import { Argument, Command, Flag, GlobalFlag } from "effect/cli"
 import pkg from "../package.json" with { type: "json" }
 import { runDoctor } from "./commands/doctor.ts"
 import { checkIdentity, interactiveSession, listIdentities, setIdentity } from "./commands/identity.ts"
+import { initConfig } from "./commands/init.ts"
 import { newWorktree } from "./commands/new.ts"
 import { Config, defaultConfigPath } from "./services/Config.ts"
 import { DryRunLog, renderPlan } from "./services/DryRun.ts"
@@ -164,9 +165,41 @@ const doctorCommand = Command.make(
     }).pipe(reportPlan)
 ).pipe(Command.withDescription("audit identity, origin and hooks path"), Command.provide(services))
 
+const initCommand = Command.make(
+  "init",
+  {
+    yes: Flag.Boolean("yes").pipe(
+      Flag.withDescription("write zwt.toml without prompting, including an existing file"),
+      Flag.withDefault(false)
+    ),
+    config: configFlag
+  },
+  ({ config, yes }) =>
+    Effect.gen(function*() {
+      const file = configFile(config)
+      const result = yield* initConfig({
+        file,
+        home: process.env.HOME ?? "~",
+        xdgConfigHome: process.env.XDG_CONFIG_HOME,
+        yes,
+        interactive: interactiveSession()
+      })
+      const verb = (yield* DryRun) ? "would write" : "wrote"
+      const line = result._tag === "Declined"
+        ? `not written ${result.file}`
+        : result._tag === "Imported"
+          ? `${verb} ${result.file} (${result.count} ${result.count === 1 ? "identity" : "identities"})`
+          : `${verb} starter ${result.file}`
+      yield* Console.log(line)
+    }).pipe(reportPlan)
+).pipe(
+  Command.withDescription("write zwt.toml from includeIf gitdir identities, or a personal starter"),
+  Command.provide(services)
+)
+
 export const zwt = Command.make("zwt").pipe(
   Command.withDescription("git worktree helper"),
-  Command.withSubcommands([configCommand, newCommand, identityCommand, doctorCommand]),
+  Command.withSubcommands([configCommand, newCommand, identityCommand, doctorCommand, initCommand]),
   Command.withGlobalFlags([DryRun])
 )
 
