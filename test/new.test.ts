@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Option, PlatformError } from "effect"
+import { TestConsole } from "effect/testing"
 import { newWorktree } from "../src/commands/new.ts"
 import { GitCommandFailed } from "../src/errors.ts"
 import { Config, parseConfig } from "../src/services/Config.ts"
@@ -21,7 +22,8 @@ const options = (slug = "login") => ({
     email: Option.none<string>(),
     identity: Option.none<string>()
   },
-  interactive: false
+  interactive: false,
+  strict: false
 })
 const notFound = (args: string) => new GitCommandFailed({ args: args.split(" "), exitCode: 1, stderr: "" })
 
@@ -63,7 +65,32 @@ const runtime = (
   files = excludeRecorder()
 ) => Layer.mergeAll(fake.layer, configLayer, prompt, files.layer)
 
+const remoteSource = `${source}
+[identity.external]
+name = "Jane External"
+email = "jane.external@example.com"
+
+[[remote]]
+pattern = "github.com/other-org/"
+identity = "external"
+`
+const remoteConfig = Layer.succeed(Config, {
+  load: () => parseConfig("remote.toml", remoteSource),
+  upsertProject: () => Effect.die("not saved")
+})
+const logged = (lines: ReadonlyArray<unknown>) => lines.map(String).join("\n")
+const withRemote = (fake: ReturnType<typeof Git.fake>, files = excludeRecorder()) =>
+  Layer.mergeAll(fake.layer, remoteConfig, Prompt.scripted({}), files.layer, TestConsole.layer)
+const otherOrg = "https://github.com/other-org/web.git"
+
 describe("zwt new with a fake Git layer", () => {
+  it("does not branch on the dry-run flag", () => {
+    const text = readFileSync(new URL("../src/commands/new.ts", import.meta.url), "utf8")
+    expect(text.includes("DryRun")).toBe(false)
+    expect(text.includes("dry-run")).toBe(false)
+    expect(text.includes("dryRun")).toBe(false)
+  })
+
   it.effect("fetches the base and creates the branch from origin", () => {
     const fake = Git.fake(baseResponses)
     const files = excludeRecorder(() => Effect.succeed("# comments\n"))
@@ -260,5 +287,92 @@ describe("zwt new with a fake Git layer", () => {
       })
       expect(result).toMatchObject({ _tag: "Created", email: "flag@example.com" })
     }).pipe(Effect.provide(runtime(fake)))
+  })
+
+  it.effect("warns when origin requires another identity and still creates the worktree", () => {
+    const fake = Git.fake({ ...baseResponses, "remote get-url origin": otherOrg })
+    return Effect.gen(function*() {
+      const result = yield* newWorktree(options())
+      expect(result).toMatchObject({ _tag: "Created", email: "jane.doe@example.com" })
+      const text = logged(yield* TestConsole.errorLines)
+      expect(text).toContain(`matches "github.com/other-org/"`)
+      expect(text).toContain('requires identity "external"')
+      expect(text).toContain('uses "work"')
+      expect(text).toContain(`zwt identity set external ${repo}`)
+      expect(fake.calls.some((call) => call[0] === "worktree" && call[1] === "add")).toBe(true)
+    }).pipe(Effect.provide(withRemote(fake)))
+  })
+
+  it.effect("refuses to create when --strict and origin requires another identity", () => {
+    const fake = Git.fake({ ...baseResponses, "remote get-url origin": otherOrg })
+    return Effect.gen(function*() {
+      const error = yield* Effect.flip(newWorktree({ ...options(), strict: true }))
+      expect(error._tag).toBe("RemoteIdentityMismatch")
+      if (error._tag === "RemoteIdentityMismatch") expect(error.fix).toBe(`zwt identity set external ${repo}`)
+      expect(fake.calls.some((call) => call[0] === "fetch" || (call[0] === "worktree" && call[1] === "add"))).toBe(false)
+    }).pipe(Effect.provide(withRemote(fake)))
+  })
+
+  it.effect("does not warn when the repo has no origin", () => {
+    const fake = Git.fake({
+      ...baseResponses,
+      "remote": "",
+      "remote get-url origin": new GitCommandFailed({
+        args: ["remote", "get-url", "origin"],
+        exitCode: 2,
+        stderr: "error: No such remote 'origin'"
+      }),
+      "rev-parse --verify --quiet develop^{commit}": "abc",
+      "worktree add -b feature/login /home/jane/work/acme/worktrees/web/login develop": ""
+    })
+    return Effect.gen(function*() {
+      expect((yield* newWorktree(options()))._tag).toBe("Created")
+      expect(logged(yield* TestConsole.errorLines)).toBe("")
+    }).pipe(Effect.provide(withRemote(fake)))
+  })
+
+  it.effect("does not warn when origin matches no [[remote]] pattern", () => {
+    const fake = Git.fake({ ...baseResponses, "remote get-url origin": "git@gitlab.com:acme/web.git" })
+    return Effect.gen(function*() {
+      expect((yield* newWorktree(options()))._tag).toBe("Created")
+      expect(logged(yield* TestConsole.errorLines)).toBe("")
+    }).pipe(Effect.provide(withRemote(fake)))
+  })
+
+  it.effect("does not warn when the folder already uses the identity origin requires", () => {
+    const fake = Git.fake({
+      ...baseResponses,
+      "remote get-url origin": otherOrg,
+      "config --worktree user.name Jane External": "",
+      "config --worktree user.email jane.external@example.com": "",
+      "config --get user.email": "jane.external@example.com",
+      "config --show-origin --get user.email":
+        "file:/home/jane/work/acme/worktrees/web/login/.git/config.worktree\tjane.external@example.com"
+    })
+    return Effect.gen(function*() {
+      const result = yield* newWorktree({
+        ...options(),
+        flags: { ...options().flags, identity: Option.some("external") }
+      })
+      expect(result).toMatchObject({ _tag: "Created", email: "jane.external@example.com" })
+      expect(logged(yield* TestConsole.errorLines)).toBe("")
+    }).pipe(Effect.provide(withRemote(fake)))
+  })
+
+  it.effect("leaves an existing worktree alone when origin would require another identity", () => {
+    const fake = Git.fake({
+      ...baseResponses,
+      "remote get-url origin": otherOrg,
+      "worktree list --porcelain": `worktree ${repo}\nbranch refs/heads/main\n\nworktree /wt/login\nHEAD abc\nbranch refs/heads/feature/login`
+    })
+    return Effect.gen(function*() {
+      expect(yield* newWorktree({ ...options(), strict: true })).toEqual({
+        _tag: "Exists",
+        path: "/wt/login",
+        branch: "feature/login"
+      })
+      expect(logged(yield* TestConsole.errorLines)).toBe("")
+      expect(fake.calls.some((call) => call[0] === "worktree" && call[1] === "add")).toBe(false)
+    }).pipe(Effect.provide(withRemote(fake)))
   })
 })

@@ -1,8 +1,8 @@
 import { resolve as resolvePath } from "node:path"
 import { Console, Effect, Option } from "effect"
-import { DoctorFailed, IdentityMismatch, IdentityUnresolved, NotARepository, OriginMissing, RemoteMismatch, UnknownIdentity } from "../errors.ts"
+import { DoctorFailed, IdentityMismatch, IdentityUnresolved, NotARepository, OriginMissing, RemoteIdentityMismatch, RemoteMismatch, UnknownIdentity } from "../errors.ts"
 import { includeIfHint } from "./identity.ts"
-import { expandHome, profileRoot, resolveExpectRemote, resolveIdentity, type IdentityResolution } from "../resolve.ts"
+import { expandHome, matchingRemote, profileRoot, remoteIdentityClash, resolveExpectRemote, resolveIdentity, resolveIdentityKey, type IdentityResolution } from "../resolve.ts"
 import { Config, type ZwtConfig } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
 
@@ -15,7 +15,7 @@ const normalizeFolder = (path: string, cwd: string, home: string) => trimSlash(r
 export type CheckStatus = "ok" | "warn" | "fail"
 
 export interface Check {
-  readonly name: "identity" | "expect_remote" | "hooksPath" | "repository"
+  readonly name: "identity" | "expect_remote" | "remote_identity" | "hooksPath" | "repository"
   readonly status: CheckStatus
   readonly detail: string
   readonly fix?: string
@@ -72,6 +72,35 @@ const remoteCheck = (repo: string, expected: string | undefined, origin: Option.
   return { name: "expect_remote", status: "ok", detail: `origin contains ${expected}` }
 }
 
+const remoteIdentityCheck = (options: {
+  readonly repo: string
+  readonly config: ZwtConfig
+  readonly origin: Option.Option<string>
+  readonly identityKey: string | undefined
+  readonly email: string | undefined
+}): Check => {
+  const rules = options.config.remote
+  if (rules === undefined || rules.length === 0) return { name: "remote_identity", status: "ok", detail: "no [[remote]]" }
+  if (Option.isNone(options.origin)) return { name: "remote_identity", status: "ok", detail: "no origin" }
+  const matched = matchingRemote(rules, options.origin.value)
+  if (matched === undefined) return { name: "remote_identity", status: "ok", detail: "no matching [[remote]]" }
+  const clash = remoteIdentityClash({
+    config: options.config,
+    origin: options.origin.value,
+    identityKey: options.identityKey,
+    email: options.email
+  })
+  if (clash === undefined) return { name: "remote_identity", status: "ok", detail: `origin requires ${matched.identity}` }
+  const error = new RemoteIdentityMismatch({
+    repo: options.repo,
+    origin: options.origin.value,
+    pattern: clash.pattern,
+    required: clash.required,
+    actual: clash.actual
+  })
+  return fail("remote_identity", error.message, error.fix)
+}
+
 const hooksCheck = (hooksPath: Option.Option<string>): Check =>
   Option.match(hooksPath, {
     onNone: () => ({ name: "hooksPath", status: "ok", detail: "git default" }),
@@ -90,11 +119,22 @@ const auditRepo = (options: {
     const resolution = resolveIdentity({ config, repoRoot: repo, home, flags: blankFlags })
     const actual = Option.getOrElse(yield* git.configGet("user.email", repo), () => "")
     const expectedRemote = resolveExpectRemote({ config, repoRoot: repo, home })
-    const origin = expectedRemote === undefined ? Option.none<string>() : yield* git.originUrl(repo)
+    const hasRemoteRules = (config.remote?.length ?? 0) > 0
+    const origin = expectedRemote === undefined && !hasRemoteRules ? Option.none<string>() : yield* git.originUrl(repo)
     const hooksPath = yield* git.configGet("core.hooksPath", repo)
+    const identityKey = resolution._tag === "Resolved"
+      ? resolveIdentityKey({ config, repoRoot: repo, home, flags: blankFlags })
+      : undefined
     const checks = [
       identityCheck({ repo, file: configFile, resolution, actual }),
       remoteCheck(repo, expectedRemote, origin),
+      remoteIdentityCheck({
+        repo,
+        config,
+        origin,
+        identityKey,
+        email: resolution._tag === "Resolved" ? resolution.identity.email : undefined
+      }),
       hooksCheck(hooksPath)
     ]
     return {

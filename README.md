@@ -45,9 +45,11 @@ When an identity resolves, `zwt new` enables `extensions.worktreeConfig` in the 
 
 If nothing resolves and stdin is a terminal (and `CI` is unset), `zwt new` asks you to pick a configured identity and whether to save that choice as a `[[project]]` entry. Otherwise it stops. The error says the selector was skipped in non-interactive mode and names `zwt identity set`.
 
+Before creating a worktree, `zwt new` reads `origin`. When that URL contains a `[[remote]]` pattern whose identity is not the one this folder will use, it prints a warning and continues. `--strict` exits non-zero and does not create the worktree. No origin, or no matching pattern, prints nothing. `pattern` is a case-sensitive substring, not a glob (`*` is literal). The longest match wins. An existing worktree is still reported as-is. `expect_remote` on a profile is a separate check: it only asks whether the URL contains a substring.
+
 `zwt identity check` prints the effective email, the file git read it from (`git config --show-origin`), and the email zwt expected for that repo.
 
-`zwt doctor` prints ok, warn, or fail for the effective email, the origin URL when the deepest profile sets `expect_remote`, and `core.hooksPath`. A fail exits non-zero and names a fix command. Warn alone exits zero. It does not write git config, files, hooks, or `zwt.toml`. `--all` lists every `[[project]]` path and each `[[profile]]` match root that is itself a git toplevel. Unset `core.hooksPath` is ok. A set value is a warning. Base-branch freshness, bare-repo sanity, `includeIf`, and installing local hooks are not part of this command.
+`zwt doctor` prints ok, warn, or fail for the effective email, the origin URL when the deepest profile sets `expect_remote`, whether that origin matches a `[[remote]]` that requires a different identity, and `core.hooksPath`. A fail exits non-zero and names a fix command. Warn alone exits zero. It does not write git config, files, hooks, or `zwt.toml`. `--all` uses the same checks for every `[[project]]` path and each `[[profile]]` match root that is itself a git toplevel. Unset `core.hooksPath` is ok. A set value is a warning. A `[[remote]]` identity mismatch is a failure. No origin, or an origin that matches no pattern, is ok. Base-branch freshness, bare-repo sanity, `includeIf`, and installing local hooks are not part of this command.
 
 An invalid config is rejected with the offending line and a suggested fix. See `examples/zwt.toml` for a valid one.
 
@@ -87,6 +89,10 @@ email = "jane@example.com"
 name = "Jane Doe"
 email = "jane.doe@example.com"
 
+[identity.external]
+name = "Jane Doe"
+email = "jane.external@example.com"
+
 [[profile]]
 match = "~/personal/**"
 identity = "personal"
@@ -100,6 +106,10 @@ branch_prefix = "feature/"
 expect_remote = "gitlab.com:acme/"
 guards = ["pre-commit", "pre-push"]   # offered, installed only with confirmation
 
+[[remote]]
+pattern = "github.com/other-org/"      # substring of the origin URL; longest match wins
+identity = "external"
+
 [[project]]
 path = "~/work/acme/backend/api"
 base_branch = "main"                  # overrides the profile
@@ -109,7 +119,7 @@ email = "jane.ext@example.com"        # external email for this project only
 Precedence: `--flag` > `[[project]]` > most specific `[[profile]]` > global defaults.
 
 ```
-zwt new <slug> [--base <ref>] [--prefix <p>] [--email <addr>] [--identity <name>] [--dry-run]
+zwt new <slug> [--base <ref>] [--prefix <p>] [--email <addr>] [--identity <name>] [--strict] [--dry-run]
 zwt identity list | set <name> [path] | check [path]
 zwt doctor [path] [--all] [--output text|json]
 zwt list | zwt prune [--merged] [--dry-run]

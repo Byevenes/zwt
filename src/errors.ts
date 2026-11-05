@@ -135,6 +135,21 @@ export class RemoteMismatch extends Data.TaggedError("RemoteMismatch")<{
   }
 }
 
+export class RemoteIdentityMismatch extends Data.TaggedError("RemoteIdentityMismatch")<{
+  readonly repo: string
+  readonly origin: string
+  readonly pattern: string
+  readonly required: string
+  readonly actual: string
+}> {
+  override get message() {
+    return `origin ${this.origin} matches "${this.pattern}", which requires identity "${this.required}", but ${this.repo} uses "${this.actual}"`
+  }
+  get fix() {
+    return `zwt identity set ${this.required} ${this.repo}`
+  }
+}
+
 export class NotARepository extends Data.TaggedError("NotARepository")<{
   readonly path: string
   readonly file: string
@@ -181,6 +196,7 @@ export type ZwtError =
   | ConfirmationRequired
   | OriginMissing
   | RemoteMismatch
+  | RemoteIdentityMismatch
   | NotARepository
   | DoctorFailed
   | InvalidSlug
@@ -196,6 +212,7 @@ const zwtTags = new Set<string>([
   "ConfirmationRequired",
   "OriginMissing",
   "RemoteMismatch",
+  "RemoteIdentityMismatch",
   "NotARepository",
   "DoctorFailed",
   "InvalidSlug"

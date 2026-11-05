@@ -16,6 +16,7 @@ const configLayer = Config.live.pipe(
   }))
 )
 const repo = "/home/jane/work/acme/web"
+const notes = "/home/jane/personal/notes"
 const home = "/home/jane"
 const configFile = "/cfg/zwt.toml"
 const hooksUnset = new GitCommandFailed({ args: ["config", "--get", "core.hooksPath"], exitCode: 1, stderr: "" })
@@ -34,6 +35,21 @@ const isWrite = (call: ReadonlyArray<string>) =>
   (call[0] === "config" && (call.includes("--worktree") || (call[1] === "--local" && !call.includes("--get"))))
 
 const logged = (lines: ReadonlyArray<unknown>) => lines.map(String).join("\n")
+
+const remoteRules = {
+  version: 1 as const,
+  identity: {
+    personal: { name: "Jane Doe", email: "jane@example.com" },
+    external: { name: "Jane External", email: "jane.external@example.com" }
+  },
+  project: [{ path: notes, identity: "personal" }],
+  remote: [{ pattern: "github.com/other-org/", identity: "external" }]
+} satisfies ZwtConfig
+
+const remoteLayer = Layer.succeed(Config, {
+  load: () => Effect.succeed(remoteRules),
+  upsertProject: () => Effect.die("doctor must not write config")
+})
 
 const provide = (fake: ReturnType<typeof Git.fake>, config: Layer.Layer<Config> = configLayer) =>
   Layer.mergeAll(fake.layer, config, TestConsole.layer, DryRunLog.layer)
@@ -70,6 +86,7 @@ describe("zwt doctor", () => {
         [
           "identity ok matches jane.doe@example.com",
           "expect_remote ok origin contains gitlab.com:acme/",
+          "remote_identity ok no [[remote]]",
           "hooksPath ok git default"
         ].join("\n")
       )
@@ -191,13 +208,88 @@ describe("zwt doctor", () => {
       expect(parsed.currentEmail).toBe("other@example.com")
       expect(parsed.expectedEmail).toBe("jane.doe@example.com")
       expect(parsed.status).toBe("fail")
-      expect(parsed.checks.map((check) => check.name)).toEqual(["identity", "expect_remote", "hooksPath"])
+      expect(parsed.checks.map((check) => check.name)).toEqual(["identity", "expect_remote", "remote_identity", "hooksPath"])
       const identity = parsed.checks[0]
       expect(identity?.status).toBe("fail")
       expect(identity?.fix).toContain("config --worktree user.email")
       expect(parsed.checks[1]?.fix).toBeUndefined()
       expect(parsed.checks[2]?.fix).toBeUndefined()
+      expect(parsed.checks[3]?.fix).toBeUndefined()
     }).pipe(Effect.provide(provide(fake)))
+  })
+
+  it.effect("fails when origin matches a [[remote]] for a different identity", () => {
+    const fake = Git.fake({
+      "rev-parse --show-toplevel": notes,
+      "config --get user.email": "jane@example.com",
+      "remote get-url origin": "https://github.com/other-org/notes.git",
+      "config --get core.hooksPath": hooksUnset
+    })
+    return Effect.gen(function*() {
+      const error = yield* Effect.flip(doctor({ cwd: notes }))
+      expect(error._tag).toBe("DoctorFailed")
+      if (error._tag === "DoctorFailed") {
+        expect(error.message).toBe("1 check failed")
+        expect(error.fix).toBe(`zwt identity set external ${notes}`)
+      }
+      const text = logged(yield* TestConsole.logLines)
+      expect(text).toContain("identity ok matches jane@example.com")
+      expect(text).toContain("expect_remote ok no expect_remote")
+      expect(text).toContain('remote_identity fail origin https://github.com/other-org/notes.git matches "github.com/other-org/"')
+      expect(text).toContain(`fix: zwt identity set external ${notes}`)
+      expect(fake.calls.some(isWrite)).toBe(false)
+    }).pipe(Effect.provide(provide(fake, remoteLayer)))
+  })
+
+  it.effect("does not fail a [[remote]] table when the repo has no origin", () => {
+    const fake = Git.fake({
+      "rev-parse --show-toplevel": notes,
+      "config --get user.email": "jane@example.com",
+      "remote get-url origin": new GitCommandFailed({
+        args: ["remote", "get-url", "origin"],
+        exitCode: 2,
+        stderr: "error: No such remote 'origin'"
+      }),
+      "config --get core.hooksPath": hooksUnset
+    })
+    return Effect.gen(function*() {
+      yield* doctor({ cwd: notes })
+      expect(logged(yield* TestConsole.logLines)).toContain("remote_identity ok no origin")
+    }).pipe(Effect.provide(provide(fake, remoteLayer)))
+  })
+
+  it.effect("does not fail when origin matches no [[remote]] pattern", () => {
+    const fake = Git.fake({
+      "rev-parse --show-toplevel": notes,
+      "config --get user.email": "jane@example.com",
+      "remote get-url origin": "git@gitlab.com:acme/notes.git",
+      "config --get core.hooksPath": hooksUnset
+    })
+    return Effect.gen(function*() {
+      yield* doctor({ cwd: notes })
+      expect(logged(yield* TestConsole.logLines)).toContain("remote_identity ok no matching [[remote]]")
+    }).pipe(Effect.provide(provide(fake, remoteLayer)))
+  })
+
+  it.effect("accepts an origin whose [[remote]] identity is the folder identity", () => {
+    const agreed = Layer.succeed(Config, {
+      load: () =>
+        Effect.succeed({
+          ...remoteRules,
+          remote: [{ pattern: "github.com/other-org/", identity: "personal" }]
+        }),
+      upsertProject: () => Effect.die("doctor must not write config")
+    })
+    const fake = Git.fake({
+      "rev-parse --show-toplevel": notes,
+      "config --get user.email": "jane@example.com",
+      "remote get-url origin": "https://github.com/other-org/notes.git",
+      "config --get core.hooksPath": hooksUnset
+    })
+    return Effect.gen(function*() {
+      yield* doctor({ cwd: notes })
+      expect(logged(yield* TestConsole.logLines)).toContain("remote_identity ok origin requires personal")
+    }).pipe(Effect.provide(provide(fake, agreed)))
   })
 })
 
@@ -318,6 +410,45 @@ describe("zwt doctor --all", () => {
       yield* doctor({ all: true, output: "json" })
       expect(JSON.parse(logged(yield* TestConsole.logLines))).toEqual({ repos: [] })
     }).pipe(Effect.provide(provide(Git.fake({}), empty)))
+  })
+
+  it.effect("fails a configured repo whose origin requires another identity", () => {
+    const fake = Git.fake({
+      [key(notes, "rev-parse --show-toplevel")]: notes,
+      [key(notes, "config --get user.email")]: "jane@example.com",
+      [key(notes, "remote get-url origin")]: "https://github.com/other-org/notes.git",
+      [key(notes, "config --get core.hooksPath")]: hooksUnset
+    })
+    return Effect.gen(function*() {
+      const error = yield* Effect.flip(doctor({ all: true }))
+      expect(error._tag).toBe("DoctorFailed")
+      const text = logged(yield* TestConsole.logLines)
+      expect(text).toContain(`${notes} | jane@example.com | jane@example.com | fail`)
+      expect(text).toContain(`zwt identity set external ${notes}`)
+      expect(fake.calls.some(isWrite)).toBe(false)
+    }).pipe(Effect.provide(provide(fake, remoteLayer)))
+  })
+
+  it.effect("includes the remote identity failure in --all json", () => {
+    const fake = Git.fake({
+      [key(notes, "rev-parse --show-toplevel")]: notes,
+      [key(notes, "config --get user.email")]: "jane@example.com",
+      [key(notes, "remote get-url origin")]: "https://github.com/other-org/notes.git",
+      [key(notes, "config --get core.hooksPath")]: hooksUnset
+    })
+    return Effect.gen(function*() {
+      yield* Effect.flip(doctor({ all: true, output: "json" }))
+      const parsed = JSON.parse(logged(yield* TestConsole.logLines)) as {
+        readonly repos: ReadonlyArray<{
+          readonly status: string
+          readonly checks: ReadonlyArray<{ readonly name: string; readonly status: string; readonly fix?: string }>
+        }>
+      }
+      expect(parsed.repos[0]?.status).toBe("fail")
+      const check = parsed.repos[0]?.checks.find((item) => item.name === "remote_identity")
+      expect(check?.status).toBe("fail")
+      expect(check?.fix).toContain(`zwt identity set external ${notes}`)
+    }).pipe(Effect.provide(provide(fake, remoteLayer)))
   })
 
   it.effect("stops the scan when git fails for a reason other than a missing repo", () => {

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
-import { expandHome, isValidSlug, profileRoot, resolveExpectRemote, resolveNew } from "../src/resolve.ts"
-import { parseConfig } from "../src/services/Config.ts"
+import { expandHome, isValidSlug, matchingRemote, profileRoot, remoteIdentityClash, resolveExpectRemote, resolveIdentityKey, resolveNew } from "../src/resolve.ts"
+import { parseConfig, type ZwtConfig } from "../src/services/Config.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
 const none = {
@@ -145,4 +145,84 @@ describe("resolveNew precedence: flag > project > profile > defaults", () => {
       const plan = resolveNew({ config, repoRoot: "/srv/tool", slug: "x", home, flags: none })
       expect(plan.scratchDir).toBe(".scratch")
     }))
+})
+
+describe("[[remote]] identity", () => {
+  const config = {
+    version: 1 as const,
+    identity: {
+      personal: { name: "Jane Doe", email: "jane@example.com" },
+      external: { name: "Jane External", email: "jane.external@example.com" }
+    },
+    profile: [{ match: "/home/jane/work/acme/**", identity: "personal" }],
+    project: [{ path: "/home/jane/work/acme/web", identity: "external" }],
+    remote: [
+      { pattern: "github.com/", identity: "personal" },
+      { pattern: "github.com/other-org/", identity: "external" },
+      { pattern: "abc", identity: "personal" },
+      { pattern: "bcy", identity: "external" }
+    ]
+  } satisfies ZwtConfig
+
+  it("uses the longest substring and keeps the earlier entry on a tie", () => {
+    expect(matchingRemote(config.remote, "https://github.com/other-org/app.git")?.identity).toBe("external")
+    expect(matchingRemote(config.remote, "git@github.com:other-org/app.git")).toBeUndefined()
+    expect(matchingRemote(config.remote, "https://GitHub.com/other-org/app.git")).toBeUndefined()
+    expect(matchingRemote(
+      [{ pattern: "github.com/other-org/*", identity: "external" }],
+      "https://github.com/other-org/app.git"
+    )).toBeUndefined()
+    expect(matchingRemote(config.remote, "xxabcyy")?.identity).toBe("personal")
+    expect(remoteIdentityClash({
+      config,
+      origin: "https://github.com/other-org/app.git",
+      identityKey: "personal",
+      email: "jane@example.com"
+    })).toEqual({ pattern: "github.com/other-org/", required: "external", actual: "personal" })
+    expect(remoteIdentityClash({
+      config,
+      origin: "https://github.com/acme/app.git",
+      identityKey: "personal",
+      email: "jane@example.com"
+    })).toBeUndefined()
+    expect(remoteIdentityClash({
+      config,
+      origin: undefined,
+      identityKey: "personal",
+      email: "jane@example.com"
+    })).toBeUndefined()
+    expect(remoteIdentityClash({
+      config,
+      origin: "https://github.com/other-org/app.git",
+      identityKey: undefined,
+      email: "jane.external@example.com"
+    })).toBeUndefined()
+    expect(remoteIdentityClash({
+      config,
+      origin: "https://github.com/other-org/app.git",
+      identityKey: undefined,
+      email: "jane@example.com"
+    })).toEqual({ pattern: "github.com/other-org/", required: "external", actual: "jane@example.com" })
+    expect(remoteIdentityClash({
+      config,
+      origin: "https://github.com/other-org/app.git",
+      identityKey: undefined,
+      email: undefined
+    })).toEqual({ pattern: "github.com/other-org/", required: "external", actual: "(unresolved)" })
+  })
+
+  it("prefers the project identity key over the profile", () => {
+    expect(resolveIdentityKey({
+      config,
+      repoRoot: "/home/jane/work/acme/web",
+      home,
+      flags: { identity: Option.none() }
+    })).toBe("external")
+    expect(resolveIdentityKey({
+      config,
+      repoRoot: "/home/jane/work/acme/other",
+      home,
+      flags: { identity: Option.none() }
+    })).toBe("personal")
+  })
 })

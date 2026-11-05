@@ -1,9 +1,9 @@
 import { Console, Effect, FileSystem, Option } from "effect"
 import { applyWorktreeIdentity } from "./identity.ts"
-import { BranchNotFound, IdentityUnresolved, InvalidSlug, UnknownIdentity } from "../errors.ts"
+import { BranchNotFound, IdentityUnresolved, InvalidSlug, RemoteIdentityMismatch, UnknownIdentity } from "../errors.ts"
 import { appendExcludeLine } from "../exclude.ts"
-import { isValidSlug, type Identity, type NewFlags, resolveNew } from "../resolve.ts"
-import { Config } from "../services/Config.ts"
+import { isValidSlug, type Identity, type NewFlags, remoteIdentityClash, resolveIdentityKey, resolveNew } from "../resolve.ts"
+import { Config, type ZwtConfig } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
 import { Prompt } from "../services/Prompt.ts"
 
@@ -51,7 +51,36 @@ const chooseIdentity = (options: {
     if (named === undefined) return yield* new UnknownIdentity({ name: chosen, file: configFile })
     const save = yield* (yield* Prompt).confirm(`Save identity "${chosen}" for ${repoRoot}?`)
     if (save) yield* (yield* Config).upsertProject(configFile, { path: repoRoot, identity: chosen, home })
-    return named
+    return { identity: named, key: chosen }
+  })
+
+const enforceRemoteIdentity = (options: {
+  readonly config: ZwtConfig
+  readonly repoRoot: string
+  readonly identityKey: string | undefined
+  readonly email: string
+  readonly strict: boolean
+}) =>
+  Effect.gen(function*() {
+    if ((options.config.remote?.length ?? 0) === 0) return
+    const origin = Option.getOrUndefined(yield* (yield* Git).originUrl(options.repoRoot))
+    if (origin === undefined) return
+    const clash = remoteIdentityClash({
+      config: options.config,
+      origin,
+      identityKey: options.identityKey,
+      email: options.email
+    })
+    if (clash === undefined) return
+    const error = new RemoteIdentityMismatch({
+      repo: options.repoRoot,
+      origin,
+      pattern: clash.pattern,
+      required: clash.required,
+      actual: clash.actual
+    })
+    if (options.strict) return yield* error
+    yield* Console.error(`warning: ${error.message}\n  fix: ${error.fix}`)
   })
 
 /** `zwt new <slug>`: resolve the plan from zwt.toml, then create (or report) the worktree. */
@@ -62,9 +91,10 @@ export const newWorktree = (options: {
   readonly configFile: string
   readonly flags: NewFlags
   readonly interactive: boolean
+  readonly strict: boolean
 }) =>
   Effect.gen(function*() {
-    const { configFile, cwd, flags, home, interactive, slug } = options
+    const { configFile, cwd, flags, home, interactive, slug, strict } = options
     if (!isValidSlug(slug)) return yield* new InvalidSlug({ slug })
     const git = yield* Git
     const loaded = yield* (yield* Config).load(configFile)
@@ -77,8 +107,11 @@ export const newWorktree = (options: {
       return { _tag: "Exists", path: existing.value, branch: plan.branch } satisfies NewResult
     }
 
-    const identity = plan.identity._tag === "Resolved"
-      ? plan.identity.identity
+    const selected = plan.identity._tag === "Resolved"
+      ? {
+        identity: plan.identity.identity,
+        key: resolveIdentityKey({ config: loaded, repoRoot, home, flags })
+      }
       : yield* chooseIdentity({
         repoRoot,
         configFile,
@@ -90,6 +123,14 @@ export const newWorktree = (options: {
           return found === undefined ? undefined : { name: found.name, email: found.email }
         }
       })
+
+    yield* enforceRemoteIdentity({
+      config: loaded,
+      repoRoot,
+      identityKey: selected.key,
+      email: selected.identity.email,
+      strict
+    })
 
     let base = plan.base
     if (yield* git.hasRemote("origin", repoRoot)) {
@@ -103,7 +144,7 @@ export const newWorktree = (options: {
     }
 
     yield* git.addWorktree({ cwd: repoRoot, path: plan.worktreePath, branch: plan.branch, base })
-    yield* applyWorktreeIdentity({ git, repoRoot, worktreePath: plan.worktreePath, identity })
+    yield* applyWorktreeIdentity({ git, repoRoot, worktreePath: plan.worktreePath, identity: selected.identity })
     // Exists returns above and stays a no-op. Only a worktree this call just created updates exclude.
     yield* ensureScratchExcluded(repoRoot, plan.scratchDir)
     return {
@@ -111,6 +152,6 @@ export const newWorktree = (options: {
       path: plan.worktreePath,
       branch: plan.branch,
       base,
-      email: identity.email
+      email: selected.identity.email
     } satisfies NewResult
   })
