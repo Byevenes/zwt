@@ -30,6 +30,7 @@ export interface GitShape {
   readonly gitPath: (path: string, cwd: string) => Effect.Effect<string, GitCommandFailed>
   readonly refExists: (ref: string, cwd: string) => Effect.Effect<boolean, GitCommandFailed>
   readonly hasRemote: (remote: string, cwd: string) => Effect.Effect<boolean, GitCommandFailed>
+  readonly originUrl: (cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
   readonly fetch: (remote: string, branch: string, cwd: string) => Effect.Effect<void, GitCommandFailed>
   readonly worktreeForBranch: (branch: string, cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
   readonly addWorktree: (options: {
@@ -97,6 +98,11 @@ const fromRunner = (read: GitShape["run"], write: GitShape["run"]): GitShape => 
       Effect.catchIf((e) => e.exitCode === 1, () => Effect.succeed(false))
     ),
   hasRemote: (remote, cwd) => read(["remote"], cwd).pipe(Effect.map((out) => out.split("\n").includes(remote))),
+  originUrl: (cwd) =>
+    read(["remote", "get-url", "origin"], cwd).pipe(
+      Effect.map((url) => url.length === 0 ? Option.none() : Option.some(url)),
+      Effect.catchIf((error) => error.exitCode === 2, () => Effect.succeed(Option.none()))
+    ),
   fetch: (remote, branch, cwd) => write(["fetch", "--quiet", remote, branch], cwd).pipe(Effect.asVoid),
   worktreeForBranch: (branch, cwd) =>
     read(["worktree", "list", "--porcelain"], cwd).pipe(Effect.map((out) => parseWorktreeList(out, branch))),
@@ -153,9 +159,9 @@ export class Git extends Context.Service<Git, GitShape>()("zwt/Git") {
 
   static readonly fake = (responses: Readonly<Record<string, string | GitCommandFailed>>) => {
     const calls: Array<ReadonlyArray<string>> = []
-    const run: GitShape["run"] = (args) => {
+    const run: GitShape["run"] = (args, cwd) => {
       calls.push(args)
-      const response = responses[args.join(" ")]
+      const response = responses[`${cwd}\0${args.join(" ")}`] ?? responses[args.join(" ")]
       if (response === undefined) {
         return Effect.fail(new GitCommandFailed({ args, exitCode: 128, stderr: "fake git: no response" }))
       }

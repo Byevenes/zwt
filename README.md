@@ -4,7 +4,7 @@ A small CLI for git worktrees. One command creates a worktree with the right bra
 
 Built with TypeScript + [Effect](https://effect.website), compiled with Bun to a single binary.
 
-> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, and `zwt identity list|set|check`. Commands below under *Vision* are planned, not implemented. The backlog lives in the issues.
+> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt identity list|set|check`, and `zwt doctor`. `zwt list` and `zwt prune` are still planned. The backlog lives in the issues.
 
 ## Install (from source)
 
@@ -33,6 +33,10 @@ bun run build                       # dist/zwt, one executable
 ./dist/zwt identity set personal    # asks before writing a [[project]] entry
 ./dist/zwt identity check
 ./dist/zwt --dry-run identity set personal
+./dist/zwt doctor                   # ok / warn / fail for this repo
+./dist/zwt doctor --all             # one row per configured repo
+./dist/zwt doctor --output json
+./dist/zwt --dry-run doctor         # reads only; prints that there is nothing to write
 ```
 
 `zwt new` resolves branch prefix, base and identity as `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults (`main`, no prefix, `worktrees`). `--email` and `--identity` are the identity flags. The worktree goes to `<repo parent>/<worktrees_dir>/<repo>/<slug>`. Re-running with the same slug prints the existing worktree.
@@ -42,6 +46,8 @@ When an identity resolves, `zwt new` enables `extensions.worktreeConfig` in the 
 If nothing resolves and stdin is a terminal (and `CI` is unset), `zwt new` asks you to pick a configured identity and whether to save that choice as a `[[project]]` entry. Otherwise it stops. The error says the selector was skipped in non-interactive mode and names `zwt identity set`.
 
 `zwt identity check` prints the effective email, the file git read it from (`git config --show-origin`), and the email zwt expected for that repo.
+
+`zwt doctor` prints ok, warn, or fail for the effective email, the origin URL when the deepest profile sets `expect_remote`, and `core.hooksPath`. A fail exits non-zero and names a fix command. Warn alone exits zero. It does not write git config, files, hooks, or `zwt.toml`. `--all` lists every `[[project]]` path and each `[[profile]]` match root that is itself a git toplevel. Unset `core.hooksPath` is ok. A set value is a warning. Base-branch freshness, bare-repo sanity, `includeIf`, and installing local hooks are not part of this command.
 
 An invalid config is rejected with the offending line and a suggested fix. See `examples/zwt.toml` for a valid one.
 
@@ -55,10 +61,11 @@ An invalid config is rejected with the offending line and a suggested fix. See `
 ## Vision
 
 - **Profiles by folder.** A profile matches a folder (`~/work/acme/**`) and sets the base branch, branch prefix, and git identity for every repo under it.
-- **Identity outside worktrees.** `zwt` applies identity with worktree-local git config. Writing an `includeIf "gitdir:"` snippet, and `zwt doctor` checking it before you commit, are still planned.
-- **Local guards, never versioned files.** Optional pre-commit/pre-push guards and `info/exclude` entries are installed only in `.git/`, only after confirmation.
+- **Identity outside worktrees.** `zwt` applies identity with worktree-local git config. Writing an `includeIf "gitdir:"` snippet is still planned. `zwt doctor` compares the effective email and does not write includeIf.
+- **Local guards, never versioned files.** Optional pre-commit/pre-push guards are not installed by `zwt doctor`. `info/exclude` entries are installed only in `.git/`, only after confirmation, by `zwt new`.
+- **Not in `zwt doctor` yet.** Base-branch freshness, bare-repo sanity, and installing local hooks.
 - **Portable.** One XDG config file, no secrets, so it moves to the next job or machine.
-- **Filters you can add.** Runtime version, remote host, hooksPath, and more, as `doctor` checks.
+- **Filters you can add.** Runtime version and further checks, later.
 
 ## Non-goals
 
@@ -104,7 +111,7 @@ Precedence: `--flag` > `[[project]]` > most specific `[[profile]]` > global defa
 ```
 zwt new <slug> [--base <ref>] [--prefix <p>] [--email <addr>] [--identity <name>] [--dry-run]
 zwt identity list | set <name> [path] | check [path]
-zwt doctor [path]
+zwt doctor [path] [--all] [--output text|json]
 zwt list | zwt prune [--merged] [--dry-run]
 ```
 

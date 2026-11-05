@@ -39,6 +39,33 @@ describe("fake Git layer", () => {
     }).pipe(Effect.provide(fake.layer))
   })
 
+  it.effect("reads the origin url", () => {
+    const fake = Git.fake({ "remote get-url origin": "git@gitlab.com:acme/web.git" })
+    return Effect.gen(function*() {
+      expect(yield* (yield* Git).originUrl("/repo")).toEqual(Option.some("git@gitlab.com:acme/web.git"))
+    }).pipe(Effect.provide(fake.layer))
+  })
+
+  it.effect("treats a missing origin as an empty read", () => {
+    const args = ["remote", "get-url", "origin"]
+    const fake = Git.fake({ [args.join(" ")]: new GitCommandFailed({ args, exitCode: 2, stderr: "error: No such remote 'origin'" }) })
+    return Effect.gen(function*() {
+      expect(yield* (yield* Git).originUrl("/repo")).toEqual(Option.none())
+    }).pipe(Effect.provide(fake.layer))
+  })
+
+  it.effect("answers one command differently for each cwd", () => {
+    const fake = Git.fake({
+      "/a\0rev-parse --show-toplevel": "/a",
+      "/b\0rev-parse --show-toplevel": "/b"
+    })
+    return Effect.gen(function*() {
+      const git = yield* Git
+      expect(yield* git.repoRoot("/a")).toBe("/a")
+      expect(yield* git.repoRoot("/b")).toBe("/b")
+    }).pipe(Effect.provide(fake.layer))
+  })
+
   it("parses git config --show-origin", () => {
     expect(parseConfigOrigin("file:/repo/.git/worktrees/login/config.worktree\tada@example.com\n")).toEqual(
       Option.some({ file: "/repo/.git/worktrees/login/config.worktree", value: "ada@example.com" })
@@ -58,5 +85,11 @@ describe("dry-run git config", () => {
       const planned = yield* (yield* DryRunLog).planned
       expect(planned.map((write) => write.description).join("\n")).toContain("config --worktree user.email ada@example.com")
       expect(planned.some((write) => write.description.includes("--global"))).toBe(false)
+    }).pipe(Effect.provide(Layer.mergeAll(Git.dryRun, DryRunLog.layer).pipe(Layer.provideMerge(DryRunLog.layer)))))
+
+  it.effect("does not record an origin read", () =>
+    Effect.gen(function*() {
+      yield* (yield* Git).originUrl(process.cwd())
+      expect(yield* (yield* DryRunLog).planned).toEqual([])
     }).pipe(Effect.provide(Layer.mergeAll(Git.dryRun, DryRunLog.layer).pipe(Layer.provideMerge(DryRunLog.layer)))))
 })

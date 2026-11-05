@@ -1,6 +1,7 @@
 import { Console, Effect, Layer, Option } from "effect"
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli"
 import pkg from "../package.json" with { type: "json" }
+import { runDoctor } from "./commands/doctor.ts"
 import { checkIdentity, interactiveSession, listIdentities, setIdentity } from "./commands/identity.ts"
 import { newWorktree } from "./commands/new.ts"
 import { Config, defaultConfigPath } from "./services/Config.ts"
@@ -136,9 +137,31 @@ const identityCommand = Command.make("identity").pipe(
   Command.withSubcommands([identityList, identitySet, identityCheck])
 )
 
+const doctorCommand = Command.make(
+  "doctor",
+  {
+    all: Flag.Boolean("all").pipe(Flag.withDescription("audit every configured repo"), Flag.withDefault(false)),
+    output: Flag.Literals("output", ["text", "json"]).pipe(
+      Flag.withDescription("report format"),
+      Flag.withDefault("text" as const)
+    ),
+    path: Argument.String("path").pipe(Argument.withDescription("repo to inspect; default is this repo"), Argument.optional),
+    config: configFlag
+  },
+  ({ all, config, output, path }) =>
+    runDoctor({
+      all,
+      output,
+      path,
+      cwd: process.cwd(),
+      home: process.env.HOME ?? "~",
+      configFile: configFile(config)
+    }).pipe(reportPlan)
+).pipe(Command.withDescription("audit identity, origin and hooks path"), Command.provide(services))
+
 export const zwt = Command.make("zwt").pipe(
   Command.withDescription("git worktree helper"),
-  Command.withSubcommands([configCommand, newCommand, identityCommand]),
+  Command.withSubcommands([configCommand, newCommand, identityCommand, doctorCommand]),
   Command.withGlobalFlags([DryRun])
 )
 
