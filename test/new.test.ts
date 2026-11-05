@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, FileSystem, Layer, Option } from "effect"
+import { Effect, FileSystem, Layer, Option, PlatformError } from "effect"
 import { newWorktree } from "../src/commands/new.ts"
 import { GitCommandFailed } from "../src/errors.ts"
 import { Config, parseConfig } from "../src/services/Config.ts"
@@ -38,15 +38,35 @@ const baseResponses = {
   "config --worktree user.email jane.doe@example.com": "",
   "config --get user.email": "jane.doe@example.com",
   "config --show-origin --get user.email":
-    "file:/home/jane/work/acme/worktrees/web/login/.git/config.worktree\tjane.doe@example.com"
+    "file:/home/jane/work/acme/worktrees/web/login/.git/config.worktree\tjane.doe@example.com",
+  "rev-parse --git-path info/exclude": ".git/info/exclude"
 }
 
-const runtime = (fake: ReturnType<typeof Git.fake>, prompt = Prompt.scripted({})) =>
-  Layer.mergeAll(fake.layer, configLayer, prompt)
+const excludeFile = `${repo}/.git/info/exclude`
+
+const excludeRecorder = (
+  read: (path: string) => Effect.Effect<string, PlatformError.PlatformError> = () => Effect.succeed("")
+) => {
+  const writes: Array<{ readonly path: string; readonly data: string }> = []
+  const layer = FileSystem.layerNoop({
+    readFileString: read,
+    writeFileString: (path, data) => Effect.sync(() => {
+      writes.push({ path, data })
+    })
+  })
+  return { writes, layer }
+}
+
+const runtime = (
+  fake: ReturnType<typeof Git.fake>,
+  prompt = Prompt.scripted({}),
+  files = excludeRecorder()
+) => Layer.mergeAll(fake.layer, configLayer, prompt, files.layer)
 
 describe("zwt new with a fake Git layer", () => {
   it.effect("fetches the base and creates the branch from origin", () => {
     const fake = Git.fake(baseResponses)
+    const files = excludeRecorder(() => Effect.succeed("# comments\n"))
     return Effect.gen(function*() {
       const result = yield* newWorktree(options())
       expect(result).toMatchObject({
@@ -58,10 +78,51 @@ describe("zwt new with a fake Git layer", () => {
       expect(fake.calls.map((c) => c.join(" "))).toContain("fetch --quiet origin develop")
       expect(fake.calls.map((c) => c.join(" "))).toContain("config --worktree user.email jane.doe@example.com")
       expect(fake.calls.some((c) => c.includes("--global"))).toBe(false)
-    }).pipe(Effect.provide(runtime(fake)))
+      expect(files.writes).toEqual([{ path: excludeFile, data: "# comments\n.scratch\n" }])
+      expect(files.writes.some((write) => write.path.endsWith(".gitignore"))).toBe(false)
+    }).pipe(Effect.provide(runtime(fake, Prompt.scripted({}), files)))
+  })
+
+  it.effect("does not rewrite info/exclude when the scratch dir is already listed", () => {
+    const fake = Git.fake(baseResponses)
+    const files = excludeRecorder(() => Effect.succeed("# comments\n.scratch\n"))
+    return Effect.gen(function*() {
+      expect((yield* newWorktree(options()))._tag).toBe("Created")
+      expect(files.writes).toEqual([])
+    }).pipe(Effect.provide(runtime(fake, Prompt.scripted({}), files)))
+  })
+
+  it.effect("creates info/exclude when the file is missing", () => {
+    const fake = Git.fake(baseResponses)
+    const files = excludeRecorder(() =>
+      Effect.fail(PlatformError.systemError({
+        _tag: "NotFound",
+        module: "FileSystem",
+        method: "readFileString",
+        pathOrDescriptor: excludeFile
+      }))
+    )
+    return Effect.gen(function*() {
+      expect((yield* newWorktree(options()))._tag).toBe("Created")
+      expect(files.writes).toEqual([{ path: excludeFile, data: ".scratch\n" }])
+    }).pipe(Effect.provide(runtime(fake, Prompt.scripted({}), files)))
+  })
+
+  it.effect("appends a configured scratch_dir", () => {
+    const fake = Git.fake(baseResponses)
+    const files = excludeRecorder()
+    const config = Layer.succeed(Config, {
+      load: () => parseConfig("valid.toml", source.replace('scratch_dir = ".scratch"', 'scratch_dir = ".notes"')),
+      upsertProject: () => Effect.die("not saved")
+    })
+    return Effect.gen(function*() {
+      expect((yield* newWorktree(options()))._tag).toBe("Created")
+      expect(files.writes).toEqual([{ path: excludeFile, data: ".notes\n" }])
+    }).pipe(Effect.provide(Layer.mergeAll(fake.layer, config, Prompt.scripted({}), files.layer)))
   })
 
   it.effect("reports the existing worktree on re-run", () => {
+    const files = excludeRecorder()
     const fake = Git.fake({
       ...baseResponses,
       "worktree list --porcelain": `worktree ${repo}\nbranch refs/heads/main\n\nworktree /wt/login\nHEAD abc\nbranch refs/heads/feature/login`
@@ -69,7 +130,8 @@ describe("zwt new with a fake Git layer", () => {
     return Effect.gen(function*() {
       expect(yield* newWorktree(options())).toEqual({ _tag: "Exists", path: "/wt/login", branch: "feature/login" })
       expect(fake.calls.some((c) => c[0] === "worktree" && c[1] === "add")).toBe(false)
-    }).pipe(Effect.provide(runtime(fake)))
+      expect(files.writes).toEqual([])
+    }).pipe(Effect.provide(runtime(fake, Prompt.scripted({}), files)))
   })
 
   it.effect("fails with BranchNotFound when the base is neither remote nor local", () => {
@@ -135,7 +197,7 @@ describe("zwt new with a fake Git layer", () => {
       expect(choices[0]?.slice().sort()).toEqual(["personal", "work"])
       expect(saved).toEqual([{ file: "/cfg/zwt.toml", identity: "personal", path: "/srv/tool" }])
       expect(fake.calls.some((c) => c.includes("--global"))).toBe(false)
-    }).pipe(Effect.provide(Layer.mergeAll(fake.layer, config, prompt)))
+    }).pipe(Effect.provide(Layer.mergeAll(fake.layer, config, prompt, excludeRecorder().layer)))
   })
 
   it.effect("applies the selected identity when the folder save is declined", () => {
@@ -156,7 +218,7 @@ describe("zwt new with a fake Git layer", () => {
     return Effect.gen(function*() {
       const result = yield* newWorktree({ ...options(), cwd: "/srv/tool", interactive: true })
       expect(result).toMatchObject({ _tag: "Created", email: "jane@example.com" })
-    }).pipe(Effect.provide(Layer.mergeAll(fake.layer, config, Prompt.scripted({ select: "personal", confirm: false }))))
+    }).pipe(Effect.provide(Layer.mergeAll(fake.layer, config, Prompt.scripted({ select: "personal", confirm: false }), excludeRecorder().layer)))
   })
 
   it.effect("fails with IdentityMismatch when the worktree email does not stick", () => {
