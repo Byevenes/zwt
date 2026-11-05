@@ -40,13 +40,27 @@ const Project = Schema.Struct({
   email: Schema.optionalKey(Email)
 })
 
+/**
+ * `pattern` is a case-sensitive substring of the origin URL, not a glob.
+ * `*` and `?` are literal. See `matchingRemote` for which entry wins.
+ */
+const RemotePattern = Text.check(
+  Schema.makeFilter((value: string) => value.length > 0 ? true : "must be a non-empty substring of the origin URL")
+)
+
+const Remote = Schema.Struct({
+  pattern: RemotePattern,
+  identity: Text
+})
+
 export const ZwtConfigSchema = Schema.Struct({
   version: Schema.Literal(1),
   worktrees_dir: Schema.optionalKey(Text),
   scratch_dir: Schema.optionalKey(Text),
   identity: Schema.Record(Schema.String, Identity),
   profile: Schema.optionalKey(Schema.Array(Profile)),
-  project: Schema.optionalKey(Schema.Array(Project))
+  project: Schema.optionalKey(Schema.Array(Project)),
+  remote: Schema.optionalKey(Schema.Array(Remote))
 })
 
 export type ZwtConfig = typeof ZwtConfigSchema.Type
@@ -101,7 +115,8 @@ const formatter = SchemaIssue.makeFormatterStandardSchemaV1()
 const unknownIdentityIssues = (config: ZwtConfig, source: string): ReadonlyArray<ConfigIssue> => {
   const references = [
     ...(config.profile ?? []).map((entry, index) => ["profile", index, entry.identity] as const),
-    ...(config.project ?? []).map((entry, index) => ["project", index, entry.identity] as const)
+    ...(config.project ?? []).map((entry, index) => ["project", index, entry.identity] as const),
+    ...(config.remote ?? []).map((entry, index) => ["remote", index, entry.identity] as const)
   ]
   return references.flatMap(([table, index, identity]) =>
     identity === undefined || identity in config.identity

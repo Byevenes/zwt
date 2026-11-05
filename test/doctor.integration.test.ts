@@ -81,8 +81,47 @@ describe("zwt doctor end to end (real git, temp HOME)", () => {
     expect(parsed.repo).toBe(git(repo, "rev-parse", "--show-toplevel"))
     expect(parsed.currentEmail).toBe("jane@example.com")
     expect(parsed.expectedEmail).toBe("jane@example.com")
-    expect(parsed.checks.map((check) => check.name)).toEqual(["identity", "expect_remote", "hooksPath"])
+    expect(parsed.checks.map((check) => check.name)).toEqual(["identity", "expect_remote", "remote_identity", "hooksPath"])
     expect(parsed.checks[0]?.status).toBe("ok")
     expect(parsed.checks[1]?.status).toBe("ok")
+  })
+
+  it("fails when origin matches a [[remote]] that requires another identity", () => {
+    git(repo, "config", "user.email", "jane@example.com")
+    git(repo, "remote", "add", "origin", "https://github.com/other-org/app.git")
+    const toplevel = git(repo, "rev-parse", "--show-toplevel")
+    const file = join(root, "remote.toml")
+    writeFileSync(
+      file,
+      [
+        "version = 1",
+        "[identity.personal]",
+        'name = "Jane Doe"',
+        'email = "jane@example.com"',
+        "[identity.external]",
+        'name = "Jane External"',
+        'email = "jane.external@example.com"',
+        "[[project]]",
+        `path = "${toplevel}"`,
+        'identity = "personal"',
+        "[[remote]]",
+        'pattern = "github.com/other-org/"',
+        'identity = "external"'
+      ].join("\n")
+    )
+    const result = zwt("doctor", "--config", file)
+    expect(result.status).not.toBe(0)
+    expect(result.stdout).toContain("remote_identity fail")
+    expect(result.stdout).toContain(`zwt identity set external ${toplevel}`)
+    const all = zwt("doctor", "--all", "--output", "json", "--config", file)
+    expect(all.status).not.toBe(0)
+    const parsed = JSON.parse(all.stdout) as {
+      readonly repos: ReadonlyArray<{
+        readonly checks: ReadonlyArray<{ readonly name: string; readonly status: string; readonly fix?: string }>
+      }>
+    }
+    const check = parsed.repos[0]?.checks.find((item) => item.name === "remote_identity")
+    expect(check?.status).toBe("fail")
+    expect(check?.fix).toContain(`zwt identity set external ${toplevel}`)
   })
 })

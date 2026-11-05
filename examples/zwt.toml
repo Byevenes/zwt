@@ -10,6 +10,10 @@ email = "jane@example.com"
 name = "Jane Doe"
 email = "jane.doe@example.com"
 
+[identity.external]
+name = "Jane Doe"
+email = "jane.external@example.com"
+
 [[profile]]
 match = "~/personal/**"
 identity = "personal"
@@ -22,6 +26,13 @@ base_branch = "develop"
 branch_prefix = "feature/"
 expect_remote = "gitlab.com:acme/"
 guards = ["pre-commit", "pre-push"]
+
+# pattern is a case-sensitive substring of the origin URL, not a glob.
+# `github.com/other-org/` matches https://github.com/other-org/app.git
+# and not git@github.com:other-org/app.git. The longest match wins.
+[[remote]]
+pattern = "github.com/other-org/"
+identity = "external"
 
 [[project]]
 path = "~/work/acme/backend/api"

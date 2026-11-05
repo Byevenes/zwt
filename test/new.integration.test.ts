@@ -148,4 +148,42 @@ describe("zwt new end to end (real git, temp HOME)", () => {
     expect(set.stderr).toContain("not interactive")
     expect(readFileSync(file, "utf8")).toBe(before)
   })
+
+  it("does not create a worktree when --strict and origin requires another identity", () => {
+    const previous = git(repo, "remote", "get-url", "origin")
+    const configPath = join(root, "strict-remote.toml")
+    const slug = "remote-id"
+    const path = join(home, "work", "acme", "worktrees", "web", slug)
+    writeFileSync(
+      configPath,
+      [
+        "version = 1",
+        "[identity.work]",
+        'name = "Jane Doe"',
+        'email = "jane@example.com"',
+        "[identity.external]",
+        'name = "Jane External"',
+        'email = "jane.external@example.com"',
+        "[[profile]]",
+        'match = "~/work/acme/**"',
+        'identity = "work"',
+        'base_branch = "develop"',
+        'branch_prefix = "feature/"',
+        "[[remote]]",
+        'pattern = "github.com/other-org/"',
+        'identity = "external"'
+      ].join("\n")
+    )
+    git(repo, "remote", "set-url", "origin", "https://github.com/other-org/web.git")
+    try {
+      const result = zwt("new", slug, "--strict", "--config", configPath)
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toContain('requires identity "external"')
+      expect(result.stderr).toContain("zwt identity set external")
+      expect(result.stdout.includes("created")).toBe(false)
+      expect(existsSync(path)).toBe(false)
+    } finally {
+      git(repo, "remote", "set-url", "origin", previous)
+    }
+  })
 })

@@ -69,9 +69,13 @@ const newCommand = Command.make(
     prefix: Flag.String("prefix").pipe(Flag.withDescription("branch prefix (overrides zwt.toml)"), Flag.optional),
     email: Flag.String("email").pipe(Flag.withDescription("git email for this worktree (overrides zwt.toml)"), Flag.optional),
     identity: Flag.String("identity").pipe(Flag.withDescription("identity key from zwt.toml"), Flag.optional),
+    strict: Flag.Boolean("strict").pipe(
+      Flag.withDescription("fail when origin requires a different identity"),
+      Flag.withDefault(false)
+    ),
     config: configFlag
   },
-  ({ base, config, email, identity, prefix, slug }) =>
+  ({ base, config, email, identity, prefix, slug, strict }) =>
     Effect.gen(function*() {
       const result = yield* newWorktree({
         slug,
@@ -79,7 +83,8 @@ const newCommand = Command.make(
         home: process.env.HOME ?? "~",
         configFile: configFile(config),
         interactive: interactiveSession(),
-        flags: { base, prefix, email, identity }
+        flags: { base, prefix, email, identity },
+        strict
       })
       yield* Console.log(
         result._tag === "Exists"

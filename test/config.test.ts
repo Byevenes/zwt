@@ -64,6 +64,55 @@ describe("zwt.toml schema", () => {
       expect(error.issues[0]).toMatchObject({ path: "(toml)", line: 2 })
     }))
 
+  it.effect("round-trips [[remote]] and rejects an unknown identity", () => {
+    const remoteToml = [
+      "version = 1",
+      "",
+      "[identity.personal]",
+      'name = "Jane Doe"',
+      'email = "jane@example.com"',
+      "",
+      "[identity.external]",
+      'name = "Jane External"',
+      'email = "jane.external@example.com"',
+      "",
+      "[[remote]]",
+      'pattern = "github.com/other-org/"',
+      'identity = "external"'
+    ].join("\n")
+    return Effect.gen(function*() {
+      const config = yield* parseConfig("remote.toml", remoteToml)
+      expect(config.remote).toEqual([{ pattern: "github.com/other-org/", identity: "external" }])
+      const error = yield* Effect.flip(parseConfig("remote.toml", remoteToml.replace('identity = "external"', 'identity = "ghost"')))
+      expect(error.issues[0]).toMatchObject({ path: "remote[0].identity", line: 13 })
+      expect(error.issues[0]?.message).toContain('unknown identity "ghost"')
+    })
+  })
+
+  it.effect("rejects an empty [[remote]] pattern", () =>
+    Effect.gen(function*() {
+      const source = [
+        "version = 1",
+        "[identity.external]",
+        'name = "Jane External"',
+        'email = "jane.external@example.com"',
+        "[[remote]]",
+        'pattern = ""',
+        'identity = "external"'
+      ].join("\n")
+      const error = yield* Effect.flip(parseConfig("remote.toml", source))
+      expect(error.issues[0]?.path).toBe("remote[0].pattern")
+      expect(error.issues[0]?.message).toMatch(/substring/)
+    }))
+
+  it.effect("accepts examples/zwt.toml", () =>
+    Effect.gen(function*() {
+      const example = readFileSync(new URL("../examples/zwt.toml", import.meta.url), "utf8")
+      const config = yield* parseConfig("examples/zwt.toml", example)
+      expect(config.remote?.[0]).toEqual({ pattern: "github.com/other-org/", identity: "external" })
+      expect(config.identity.external?.email).toBe("jane.external@example.com")
+    }))
+
   it("resolves the XDG path with a ~/.config fallback", () => {
     expect(defaultConfigPath({ XDG_CONFIG_HOME: "/xdg", HOME: "/home/jane" })).toBe("/xdg/zwt/zwt.toml")
     expect(defaultConfigPath({ HOME: "/home/jane" })).toBe("/home/jane/.config/zwt/zwt.toml")

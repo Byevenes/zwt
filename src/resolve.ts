@@ -89,6 +89,72 @@ export const resolveExpectRemote = (options: {
   readonly home: string
 }): string | undefined => matchesFor(options.config, trimSlash(options.repoRoot), options.home).profile?.expect_remote
 
+/** Identity key from `--identity`, then `[[project]]`, then the deepest profile. An email-only resolution has none. */
+export const resolveIdentityKey = (options: {
+  readonly config: ZwtConfig
+  readonly repoRoot: string
+  readonly home: string
+  readonly flags: Pick<NewFlags, "identity">
+}): string | undefined => {
+  const { config, flags, home } = options
+  const repoRoot = trimSlash(options.repoRoot)
+  const flagIdentity = Option.getOrUndefined(flags.identity)
+  if (flagIdentity !== undefined) return config.identity[flagIdentity] === undefined ? undefined : flagIdentity
+  const { profile, project } = matchesFor(config, repoRoot, home)
+  const identityKey = pick(project?.identity, profile?.identity)
+  return identityKey !== undefined && config.identity[identityKey] !== undefined ? identityKey : undefined
+}
+
+export interface RemoteIdentityClash {
+  readonly pattern: string
+  readonly required: string
+  readonly actual: string
+}
+
+/**
+ * `pattern` is a case-sensitive substring of the origin URL, not a glob (`*` is literal).
+ * `github.com/other-org/` matches `https://github.com/other-org/app.git` and does not match
+ * `git@github.com:other-org/app.git` (the colon is a different character). The longest match
+ * wins. Equal lengths keep the earlier `[[remote]]`.
+ */
+export const matchingRemote = (
+  remotes: ZwtConfig["remote"],
+  origin: string
+): { readonly pattern: string; readonly identity: string } | undefined => {
+  let best: { readonly pattern: string; readonly identity: string } | undefined
+  for (const remote of remotes ?? []) {
+    if (remote.pattern.length === 0 || !origin.includes(remote.pattern)) continue
+    if (best === undefined || remote.pattern.length > best.pattern.length) best = remote
+  }
+  return best
+}
+
+/**
+ * A clash is the winning `[[remote]]` requiring a different identity than the folder.
+ * Named resolutions compare keys. Email-only resolutions compare that email with the
+ * required identity's email. No origin, no rules, or no match is not a clash.
+ */
+export const remoteIdentityClash = (options: {
+  readonly config: ZwtConfig
+  readonly origin: string | undefined
+  readonly identityKey: string | undefined
+  readonly email: string | undefined
+}): RemoteIdentityClash | undefined => {
+  if (options.origin === undefined) return undefined
+  const match = matchingRemote(options.config.remote, options.origin)
+  if (match === undefined) return undefined
+  if (options.identityKey !== undefined) {
+    if (options.identityKey === match.identity) return undefined
+    return { pattern: match.pattern, required: match.identity, actual: options.identityKey }
+  }
+  if (options.email !== undefined) {
+    const requiredEmail = options.config.identity[match.identity]?.email
+    if (requiredEmail === undefined || requiredEmail === options.email) return undefined
+    return { pattern: match.pattern, required: match.identity, actual: options.email }
+  }
+  return { pattern: match.pattern, required: match.identity, actual: "(unresolved)" }
+}
+
 /** Pure resolution for `zwt new`: `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults. */
 export const resolveNew = (options: {
   readonly config: ZwtConfig
