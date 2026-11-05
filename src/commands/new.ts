@@ -1,6 +1,7 @@
-import { Console, Effect, Option } from "effect"
+import { Console, Effect, FileSystem, Option } from "effect"
 import { applyWorktreeIdentity } from "./identity.ts"
 import { BranchNotFound, IdentityUnresolved, InvalidSlug, UnknownIdentity } from "../errors.ts"
+import { appendExcludeLine } from "../exclude.ts"
 import { isValidSlug, type Identity, type NewFlags, resolveNew } from "../resolve.ts"
 import { Config } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
@@ -9,6 +10,25 @@ import { Prompt } from "../services/Prompt.ts"
 export type NewResult =
   | { readonly _tag: "Created"; readonly path: string; readonly branch: string; readonly base: string; readonly email: string }
   | { readonly _tag: "Exists"; readonly path: string; readonly branch: string }
+
+const excludeFile = (repoRoot: string, gitPath: string) =>
+  gitPath.startsWith("/") ? gitPath : `${repoRoot}/${gitPath}`
+
+const ensureScratchExcluded = (repoRoot: string, pattern: string) =>
+  Effect.gen(function*() {
+    const located = yield* (yield* Git).gitPath("info/exclude", repoRoot)
+    const file = excludeFile(repoRoot, located)
+    const fs = yield* FileSystem.FileSystem
+    const current = yield* fs.readFileString(file).pipe(
+      Effect.catchIf(
+        (error) => error.reason._tag === "NotFound",
+        () => Effect.succeed("")
+      )
+    )
+    const next = appendExcludeLine(current, pattern)
+    if (next === undefined) return
+    yield* fs.writeFileString(file, next)
+  })
 
 const chooseIdentity = (options: {
   readonly repoRoot: string
@@ -84,6 +104,8 @@ export const newWorktree = (options: {
 
     yield* git.addWorktree({ cwd: repoRoot, path: plan.worktreePath, branch: plan.branch, base })
     yield* applyWorktreeIdentity({ git, repoRoot, worktreePath: plan.worktreePath, identity })
+    // Exists returns above and stays a no-op. Only a worktree this call just created updates exclude.
+    yield* ensureScratchExcluded(repoRoot, plan.scratchDir)
     return {
       _tag: "Created",
       path: plan.worktreePath,

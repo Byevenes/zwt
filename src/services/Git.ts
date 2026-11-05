@@ -27,6 +27,7 @@ export interface GitShape {
   readonly configSet: (key: string, value: string, cwd: string, scope: GitConfigScope) => Effect.Effect<void, GitCommandFailed>
   readonly requireBranch: (branch: string, cwd: string) => Effect.Effect<void, BranchNotFound | GitCommandFailed>
   readonly repoRoot: (cwd: string) => Effect.Effect<string, GitCommandFailed>
+  readonly gitPath: (path: string, cwd: string) => Effect.Effect<string, GitCommandFailed>
   readonly refExists: (ref: string, cwd: string) => Effect.Effect<boolean, GitCommandFailed>
   readonly hasRemote: (remote: string, cwd: string) => Effect.Effect<boolean, GitCommandFailed>
   readonly fetch: (remote: string, branch: string, cwd: string) => Effect.Effect<void, GitCommandFailed>
@@ -89,6 +90,7 @@ const fromRunner = (read: GitShape["run"], write: GitShape["run"]): GitShape => 
       Effect.catchIf((e) => e.exitCode === 1, () => Effect.fail(new BranchNotFound({ branch, repo: cwd })))
     ),
   repoRoot: (cwd) => read(["rev-parse", "--show-toplevel"], cwd),
+  gitPath: (path, cwd) => read(["rev-parse", "--git-path", path], cwd),
   refExists: (ref, cwd) =>
     read(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], cwd).pipe(
       Effect.as(true),

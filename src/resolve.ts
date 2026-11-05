@@ -1,7 +1,7 @@
 import { Option } from "effect"
 import type { ZwtConfig } from "./services/Config.ts"
 
-export const defaults = { base_branch: "main", branch_prefix: "", worktrees_dir: "worktrees" } as const
+export const defaults = { base_branch: "main", branch_prefix: "", worktrees_dir: "worktrees", scratch_dir: ".scratch" } as const
 
 /** Expands a leading `~` so the same zwt.toml works on any machine. */
 export const expandHome = (path: string, home: string): string =>
@@ -37,6 +37,7 @@ export interface NewPlan {
   readonly branch: string
   readonly base: string
   readonly worktreePath: string
+  readonly scratchDir: string
   readonly identity: IdentityResolution
 }
 
@@ -101,7 +102,13 @@ export const resolveNew = (options: {
   const repoName = repoRoot.slice(repoRoot.lastIndexOf("/") + 1)
   const root = dir.startsWith("/") ? trimSlash(dir) : `${parent === "/" ? "" : parent}/${trimSlash(dir)}`
 
-  return { branch: `${prefix}${slug}`, base, worktreePath: `${root}/${repoName}/${slug}`, identity }
+  return {
+    branch: `${prefix}${slug}`,
+    base,
+    worktreePath: `${root}/${repoName}/${slug}`,
+    scratchDir: config.scratch_dir ?? defaults.scratch_dir,
+    identity
+  }
 }
 
 export const isValidSlug = (slug: string): boolean => /^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(slug) && !slug.includes("..")

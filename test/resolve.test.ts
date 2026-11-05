@@ -36,6 +36,7 @@ describe("resolveNew precedence: flag > project > profile > defaults", () => {
         branch: "feature/login",
         base: "develop",
         worktreePath: "/home/jane/work/acme/worktrees/web/login",
+        scratchDir: ".scratch",
         identity: { _tag: "Resolved", identity: { name: "Jane Doe", email: "jane.doe@example.com" } }
       })
     }))
@@ -120,5 +121,15 @@ describe("resolveNew precedence: flag > project > profile > defaults", () => {
         flags: { ...none, email: Option.some("only@example.com") }
       })
       expect(emailOnly.identity).toEqual({ _tag: "Resolved", identity: { name: "only", email: "only@example.com" } })
+    }))
+
+  it.effect("scratch_dir defaults to .scratch when the key is omitted", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig(
+        "min.toml",
+        ["version = 1", "[identity.personal]", 'name = "Ada"', 'email = "ada@example.com"'].join("\n")
+      )
+      const plan = resolveNew({ config, repoRoot: "/srv/tool", slug: "x", home, flags: none })
+      expect(plan.scratchDir).toBe(".scratch")
     }))
 })

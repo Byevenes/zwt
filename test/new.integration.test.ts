@@ -45,9 +45,18 @@ beforeAll(() => {
 
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
+const excludePath = (cwd: string) => {
+  const located = git(cwd, "rev-parse", "--git-path", "info/exclude")
+  return located.startsWith("/") ? located : join(cwd, located)
+}
+
 describe("zwt new end to end (real git, temp HOME)", () => {
   it("creates the worktree from origin/develop, then reports it on re-run", () => {
     const before = globalDigest()
+    const gitignore = join(repo, ".gitignore")
+    writeFileSync(gitignore, "keep\n")
+    const gitignoreBefore = readFileSync(gitignore)
+    const exclude = excludePath(repo)
     const first = zwt("new", "login")
     expect(first.stderr).toBe("")
     const path = join(home, "work", "acme", "worktrees", "web", "login")
@@ -60,10 +69,15 @@ describe("zwt new end to end (real git, temp HOME)", () => {
     expect(git(path, "config", "--show-origin", "--get", "user.email")).toContain("config.worktree")
     expect(git(repo, "config", "--local", "--get", "extensions.worktreeConfig")).toBe("true")
     expect(globalDigest()).toBe(before)
+    const excluded = readFileSync(exclude, "utf8")
+    expect(excluded.split(/\r?\n/).filter((line) => line.trim() === ".scratch")).toEqual([".scratch"])
+    expect(readFileSync(gitignore)).toEqual(gitignoreBefore)
 
     const again = zwt("new", "login")
     expect(again.status).toBe(0)
     expect(again.stdout).toContain(`exists ${path}`)
+    expect(readFileSync(exclude, "utf8")).toBe(excluded)
+    expect(readFileSync(gitignore)).toEqual(gitignoreBefore)
 
     const check = spawnSync(process.execPath, [main, "identity", "check"], { cwd: path, env: runEnv, encoding: "utf8" })
     expect(check.status).toBe(0)
@@ -80,13 +94,38 @@ describe("zwt new end to end (real git, temp HOME)", () => {
     expect(result.stderr).toContain("warning: could not fetch origin nope")
   })
 
-  it("dry-run plans the fetch and worktree add without writing", () => {
-    const result = zwt("--dry-run", "new", "dry")
+  it("dry-run plans the fetch, worktree add and exclude append without writing", () => {
+    const configPath = join(root, "dry-scratch.toml")
+    writeFileSync(
+      configPath,
+      [
+        "version = 1",
+        'scratch_dir = ".dry-scratch"',
+        "[identity.work]",
+        'name = "Jane Doe"',
+        'email = "jane@example.com"',
+        "[[profile]]",
+        'match = "~/work/acme/**"',
+        'identity = "work"',
+        'base_branch = "develop"',
+        'branch_prefix = "feature/"'
+      ].join("\n")
+    )
+    const exclude = excludePath(repo)
+    const before = readFileSync(exclude)
+    const gitignore = join(repo, ".gitignore")
+    const gitignoreBefore = existsSync(gitignore) ? readFileSync(gitignore) : undefined
+    const result = zwt("--dry-run", "new", "dry", "--config", configPath)
+    expect(result.status).toBe(0)
     expect(result.stdout).toContain("would create")
     expect(result.stdout).toContain("[git] git -C")
     expect(result.stdout).toContain("worktree add -b feature/dry")
+    expect(result.stdout).toContain("[fs] write")
+    expect(result.stdout).toContain("info/exclude")
     expect(existsSync(join(home, "work", "acme", "worktrees", "web", "dry"))).toBe(false)
     expect(result.stdout).toContain("config --worktree user.email")
+    expect(readFileSync(exclude)).toEqual(before)
+    if (gitignoreBefore !== undefined) expect(readFileSync(gitignore)).toEqual(gitignoreBefore)
   })
 
   it("applies --email on the new worktree and leaves the main repo email", () => {
