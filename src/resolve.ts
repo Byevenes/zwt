@@ -82,6 +82,13 @@ export const resolveIdentity = (options: {
   return { _tag: "Unresolved" }
 }
 
+/** Deepest matching profile's `expect_remote`, or nothing. The project table has no such key. */
+export const resolveExpectRemote = (options: {
+  readonly config: ZwtConfig
+  readonly repoRoot: string
+  readonly home: string
+}): string | undefined => matchesFor(options.config, trimSlash(options.repoRoot), options.home).profile?.expect_remote
+
 /** Pure resolution for `zwt new`: `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults. */
 export const resolveNew = (options: {
   readonly config: ZwtConfig

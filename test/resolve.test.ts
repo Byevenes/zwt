@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
-import { expandHome, isValidSlug, profileRoot, resolveNew } from "../src/resolve.ts"
+import { expandHome, isValidSlug, profileRoot, resolveExpectRemote, resolveNew } from "../src/resolve.ts"
 import { parseConfig } from "../src/services/Config.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
@@ -121,6 +121,19 @@ describe("resolveNew precedence: flag > project > profile > defaults", () => {
         flags: { ...none, email: Option.some("only@example.com") }
       })
       expect(emailOnly.identity).toEqual({ _tag: "Resolved", identity: { name: "only", email: "only@example.com" } })
+    }))
+
+  it.effect("expect_remote comes from the deepest profile only", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("valid.toml", source)
+      expect(resolveExpectRemote({ config, repoRoot: "/home/jane/work/acme/backend/api", home })).toBe("gitlab.com:acme/")
+      expect(resolveExpectRemote({ config, repoRoot: "/home/jane/personal/notes", home })).toBeUndefined()
+      expect(resolveExpectRemote({ config, repoRoot: "/srv/other/tool", home })).toBeUndefined()
+      const deeper = yield* parseConfig(
+        "x.toml",
+        `${source}\n[[profile]]\nmatch = "~/work/acme/backend/**"\nidentity = "work"\n`
+      )
+      expect(resolveExpectRemote({ config: deeper, repoRoot: "/home/jane/work/acme/backend/api", home })).toBeUndefined()
     }))
 
   it.effect("scratch_dir defaults to .scratch when the key is omitted", () =>

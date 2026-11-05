@@ -8,7 +8,7 @@ import { canPrompt, Prompt } from "../services/Prompt.ts"
 
 const trimSlash = (path: string) => path.replace(/\/+$/, "")
 
-const includeIfHint =
+export const includeIfHint =
   "zwt does not write includeIf; add a gitdir include by hand if this email should apply outside the worktree"
 
 export const interactiveSession = (): boolean => canPrompt({ ci: process.env.CI, stdinIsTTY: process.stdin.isTTY === true })

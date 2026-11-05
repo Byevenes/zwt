@@ -110,6 +110,55 @@ export class ConfirmationRequired extends Data.TaggedError("ConfirmationRequired
   }
 }
 
+export class OriginMissing extends Data.TaggedError("OriginMissing")<{
+  readonly repo: string
+  readonly expected: string
+}> {
+  override get message() {
+    return `no origin in ${this.repo}; expected a URL containing "${this.expected}"`
+  }
+  get fix() {
+    return `git -C ${this.repo} remote add origin <url containing ${this.expected}>`
+  }
+}
+
+export class RemoteMismatch extends Data.TaggedError("RemoteMismatch")<{
+  readonly repo: string
+  readonly expected: string
+  readonly actual: string
+}> {
+  override get message() {
+    return `origin ${this.actual} in ${this.repo} does not contain "${this.expected}"`
+  }
+  get fix() {
+    return `git -C ${this.repo} remote set-url origin <url containing ${this.expected}>`
+  }
+}
+
+export class NotARepository extends Data.TaggedError("NotARepository")<{
+  readonly path: string
+  readonly file: string
+}> {
+  override get message() {
+    return `${this.path} is not a git repository`
+  }
+  get fix() {
+    return `edit ${this.file}: [[project]] path ${this.path} is not a git repository`
+  }
+}
+
+export class DoctorFailed extends Data.TaggedError("DoctorFailed")<{
+  readonly failed: number
+  readonly fixes: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `${this.failed} ${this.failed === 1 ? "check" : "checks"} failed`
+  }
+  get fix() {
+    return this.fixes.join("\n  fix: ")
+  }
+}
+
 export class InvalidSlug extends Data.TaggedError("InvalidSlug")<{
   readonly slug: string
 }> {
@@ -130,6 +179,10 @@ export type ZwtError =
   | IdentityUnresolved
   | UnknownIdentity
   | ConfirmationRequired
+  | OriginMissing
+  | RemoteMismatch
+  | NotARepository
+  | DoctorFailed
   | InvalidSlug
 
 const zwtTags = new Set<string>([
@@ -141,6 +194,10 @@ const zwtTags = new Set<string>([
   "IdentityUnresolved",
   "UnknownIdentity",
   "ConfirmationRequired",
+  "OriginMissing",
+  "RemoteMismatch",
+  "NotARepository",
+  "DoctorFailed",
   "InvalidSlug"
 ])
 
