@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, FileSystem } from "effect"
-import { Config, defaultConfigPath, looksLikeToken, parseConfig } from "../src/services/Config.ts"
+import { Config, defaultConfigPath, looksLikeToken, parseConfig, upsertProjectToml } from "../src/services/Config.ts"
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8")
 
@@ -18,7 +18,7 @@ describe("zwt.toml schema", () => {
       const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8")
       const sketch = /```toml\n([\s\S]*?)```/.exec(readme)?.[1] ?? ""
       const config = yield* parseConfig("README.md", sketch)
-      expect(config.project?.[0]?.email).toBe("jane@acme.example")
+      expect(config.project?.[0]?.email).toBe("jane.ext@example.com")
     }))
 
   it.effect("reports schema issues with their TOML line", () =>
@@ -70,6 +70,45 @@ describe("zwt.toml schema", () => {
   })
 })
 
+describe("[[project]] update", () => {
+  it.effect("appends a folder mapping and the result still parses", () =>
+    Effect.gen(function*() {
+      const next = upsertProjectToml(fixture("valid.toml"), {
+        path: "/home/jane/notes",
+        identity: "personal",
+        home: "/home/jane"
+      })
+      expect(next).toContain('path = "/home/jane/notes"')
+      expect(next).toContain('identity = "personal"')
+      expect(next).toContain('email = "jane.ext@example.com"')
+      const config = yield* parseConfig("valid.toml", next)
+      expect(config.project?.some((project) => project.path === "/home/jane/notes" && project.identity === "personal")).toBe(true)
+    }))
+
+  it("updates the identity on a ~/ project without dropping its other keys", () => {
+    const next = upsertProjectToml(fixture("valid.toml"), {
+      path: "/home/jane/work/acme/backend/api",
+      identity: "personal",
+      home: "/home/jane"
+    })
+    expect(next).toContain('path = "~/work/acme/backend/api"')
+    expect(next).toContain('base_branch = "main"')
+    expect(next).toContain('email = "jane.ext@example.com"')
+    expect(next).toContain('identity = "personal"')
+    expect(next.match(/\[\[project\]\]/g)?.length).toBe(1)
+    const replaced = upsertProjectToml(next, {
+      path: "/home/jane/work/acme/backend/api",
+      identity: "work",
+      home: "/home/jane"
+    })
+    const project = replaced.slice(replaced.lastIndexOf("[[project]]"))
+    expect(project).toContain('identity = "work"')
+    expect(project).not.toContain("personal")
+    expect(project).toContain('email = "jane.ext@example.com"')
+    expect(replaced.match(/\[\[project\]\]/g)?.length).toBe(1)
+  })
+})
+
 describe("Config service", () => {
   it.effect("loads through the FileSystem service", () =>
     Effect.gen(function*() {
@@ -79,6 +118,27 @@ describe("Config service", () => {
       Effect.provide(Config.live),
       Effect.provide(FileSystem.layerNoop({ readFileString: () => Effect.succeed(fixture("valid.toml")) }))
     ))
+
+  it.effect("writes an updated [[project]] through the FileSystem service", () => {
+    let text = fixture("valid.toml")
+    return Effect.gen(function*() {
+      yield* (yield* Config).upsertProject("/cfg/zwt.toml", {
+        path: "/home/jane/notes",
+        identity: "personal",
+        home: "/home/jane"
+      })
+      const config = yield* parseConfig("written.toml", text)
+      expect(config.project?.some((project) => project.path === "/home/jane/notes" && project.identity === "personal")).toBe(true)
+    }).pipe(
+      Effect.provide(Config.live),
+      Effect.provide(FileSystem.layerNoop({
+        readFileString: () => Effect.succeed(text),
+        writeFileString: (_path, data) => Effect.sync(() => {
+          text = data
+        })
+      }))
+    )
+  })
 
   it.effect("fails with ConfigNotFound when the file is missing", () =>
     Effect.gen(function*() {

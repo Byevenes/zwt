@@ -1,6 +1,9 @@
 import { Context, Effect, Layer } from "effect"
 import { Prompt as CliPrompt } from "effect/cli"
 
+export const canPrompt = (input: { readonly ci: string | undefined; readonly stdinIsTTY: boolean }): boolean =>
+  input.stdinIsTTY && (input.ci === undefined || input.ci === "")
+
 export class Prompt extends Context.Service<Prompt, {
   readonly confirm: (message: string) => Effect.Effect<boolean>
   readonly select: (message: string, choices: ReadonlyArray<string>) => Effect.Effect<string>

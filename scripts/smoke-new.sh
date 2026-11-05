@@ -17,12 +17,27 @@ match = "$tmp/src/**"
 identity = "ci"
 base_branch = "main"
 TOML
+cat > "$tmp/empty.toml" <<TOML
+version = 1
+[identity.ci]
+name = "CI"
+email = "ci@example.com"
+TOML
 cd "$tmp/src/r"
 wt="$tmp/src/worktrees/r"
 "$ZWT" new demo --config "$tmp/zwt.toml"
 test -d "$wt/demo" || { echo "worktree not created"; exit 1; }
+test "$(git -C "$wt/demo" config --get user.email)" = "ci@example.com"
+git -C "$wt/demo" config --show-origin --get user.email | grep -q config.worktree
+"$ZWT" identity check --config "$tmp/zwt.toml" "$wt/demo" | grep -q "effective: ci@example.com"
 "$ZWT" new demo --config "$tmp/zwt.toml" | grep -q exists
 "$ZWT" --dry-run new other --config "$tmp/zwt.toml" | grep -q "would create"
 test ! -e "$wt/other" || { echo "dry-run wrote a worktree"; exit 1; }
 if git rev-parse -q --verify refs/heads/other >/dev/null; then echo "dry-run created a branch"; exit 1; fi
+set +e
+miss=$("$ZWT" new nope --config "$tmp/empty.toml" 2>&1)
+code=$?
+set -e
+test "$code" -ne 0
+printf '%s\n' "$miss" | grep -q "non-interactive"
 echo "smoke-new ok"
