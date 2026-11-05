@@ -174,6 +174,17 @@ export class DoctorFailed extends Data.TaggedError("DoctorFailed")<{
   }
 }
 
+export class OverwriteRefused extends Data.TaggedError("OverwriteRefused")<{
+  readonly file: string
+}> {
+  override get message() {
+    return `refusing to overwrite ${this.file}`
+  }
+  get fix() {
+    return `run zwt init in a terminal and confirm overwrite, or re-run with --yes`
+  }
+}
+
 export class InvalidSlug extends Data.TaggedError("InvalidSlug")<{
   readonly slug: string
 }> {
@@ -200,6 +211,7 @@ export type ZwtError =
   | NotARepository
   | DoctorFailed
   | InvalidSlug
+  | OverwriteRefused
 
 const zwtTags = new Set<string>([
   "BranchNotFound",
@@ -215,7 +227,8 @@ const zwtTags = new Set<string>([
   "RemoteIdentityMismatch",
   "NotARepository",
   "DoctorFailed",
-  "InvalidSlug"
+  "InvalidSlug",
+  "OverwriteRefused"
 ])
 
 export const isZwtError = <E>(u: E): u is Extract<E, ZwtError> =>
