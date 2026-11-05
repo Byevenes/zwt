@@ -16,12 +16,14 @@ export class IdentityMismatch extends Data.TaggedError("IdentityMismatch")<{
   readonly repo: string
   readonly expected: string
   readonly actual: string
+  readonly hint?: string | undefined
 }> {
   override get message() {
     return `${this.repo} commits as ${this.actual}, expected ${this.expected}`
   }
   get fix() {
-    return `git -C ${this.repo} config user.email ${this.expected}`
+    const write = `git -C ${this.repo} config --worktree user.email ${this.expected}`
+    return this.hint === undefined ? write : `${write}. ${this.hint}`
   }
 }
 
@@ -74,12 +76,37 @@ export class GitCommandFailed extends Data.TaggedError("GitCommandFailed")<{
 export class IdentityUnresolved extends Data.TaggedError("IdentityUnresolved")<{
   readonly repo: string
   readonly file: string
+  readonly reason: "non-interactive" | "empty"
 }> {
   override get message() {
     return `no git identity for ${this.repo}: no [[project]] or [[profile]] in ${this.file} matches it`
   }
   get fix() {
-    return `add a [[profile]] with match = "${this.repo}/**" and an identity to ${this.file}, then run: zwt config check`
+    const add = `add a [[profile]] with match = "${this.repo}/**" to ${this.file}, or run: zwt identity set <name> ${this.repo}`
+    return this.reason === "non-interactive" ? `selector skipped in non-interactive mode. ${add}` : add
+  }
+}
+
+export class UnknownIdentity extends Data.TaggedError("UnknownIdentity")<{
+  readonly name: string
+  readonly file: string
+}> {
+  override get message() {
+    return `unknown identity "${this.name}" in ${this.file}`
+  }
+  get fix() {
+    return `zwt identity list --config ${this.file}`
+  }
+}
+
+export class ConfirmationRequired extends Data.TaggedError("ConfirmationRequired")<{
+  readonly action: string
+}> {
+  override get message() {
+    return `${this.action} needs confirmation and the terminal is not interactive`
+  }
+  get fix() {
+    return `run it in a terminal. Confirmation is skipped in non-interactive mode`
   }
 }
 
@@ -101,6 +128,8 @@ export type ZwtError =
   | ConfigNotFound
   | GitCommandFailed
   | IdentityUnresolved
+  | UnknownIdentity
+  | ConfirmationRequired
   | InvalidSlug
 
 const zwtTags = new Set<string>([
@@ -110,6 +139,8 @@ const zwtTags = new Set<string>([
   "ConfigNotFound",
   "GitCommandFailed",
   "IdentityUnresolved",
+  "UnknownIdentity",
+  "ConfirmationRequired",
   "InvalidSlug"
 ])
 

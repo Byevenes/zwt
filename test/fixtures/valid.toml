@@ -8,7 +8,7 @@ email = "jane@example.com"
 
 [identity.work]
 name = "Jane Doe"
-email = "jane.doe@company.example"
+email = "jane.doe@example.com"
 
 [[profile]]
 match = "~/personal/**"
@@ -26,4 +26,4 @@ guards = ["pre-commit", "pre-push"]
 [[project]]
 path = "~/work/acme/backend/api"
 base_branch = "main"
-email = "jane@acme.example"
+email = "jane.ext@example.com"

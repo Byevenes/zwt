@@ -18,6 +18,8 @@ const isUnder = (path: string, root: string) => path === root || path.startsWith
 export interface NewFlags {
   readonly base: Option.Option<string>
   readonly prefix: Option.Option<string>
+  readonly email: Option.Option<string>
+  readonly identity: Option.Option<string>
 }
 
 export interface Identity {
@@ -25,14 +27,59 @@ export interface Identity {
   readonly email: string
 }
 
+/** Resolved email, an unknown `--identity` name, or nothing to apply. */
+export type IdentityResolution =
+  | { readonly _tag: "Resolved"; readonly identity: Identity }
+  | { readonly _tag: "Unresolved" }
+  | { readonly _tag: "Unknown"; readonly name: string }
+
 export interface NewPlan {
   readonly branch: string
   readonly base: string
   readonly worktreePath: string
-  readonly identity: Option.Option<Identity>
+  readonly identity: IdentityResolution
 }
 
 const pick = <A>(...candidates: ReadonlyArray<A | undefined>): A | undefined => candidates.find((c) => c !== undefined)
+
+const mailboxName = (email: string): string => {
+  const local = email.slice(0, email.indexOf("@"))
+  return local.length > 0 ? local : email
+}
+
+const matchesFor = (config: ZwtConfig, repoRoot: string, home: string) => {
+  const project = (config.project ?? []).find((p) => trimSlash(expandHome(p.path, home)) === repoRoot)
+  const profile = (config.profile ?? [])
+    .filter((p) => isUnder(repoRoot, profileRoot(p.match, home)))
+    .sort((a, b) => profileRoot(b.match, home).length - profileRoot(a.match, home).length)[0]
+  return { profile, project }
+}
+
+/** `--email` / `--identity` > `[[project]]` > deepest `[[profile]]`. */
+export const resolveIdentity = (options: {
+  readonly config: ZwtConfig
+  readonly repoRoot: string
+  readonly home: string
+  readonly flags: Pick<NewFlags, "email" | "identity">
+}): IdentityResolution => {
+  const { config, flags, home } = options
+  const repoRoot = trimSlash(options.repoRoot)
+  const { profile, project } = matchesFor(config, repoRoot, home)
+  const flagIdentity = Option.getOrUndefined(flags.identity)
+  const flagEmail = Option.getOrUndefined(flags.email)
+  if (flagIdentity !== undefined && config.identity[flagIdentity] === undefined) {
+    return { _tag: "Unknown", name: flagIdentity }
+  }
+
+  const identityKey = pick(flagIdentity, project?.identity, profile?.identity)
+  const named = identityKey === undefined ? undefined : config.identity[identityKey]
+  if (named !== undefined) {
+    const email = flagIdentity !== undefined ? (flagEmail ?? named.email) : pick(flagEmail, project?.email, named.email)
+    return { _tag: "Resolved", identity: { name: named.name, email: email ?? named.email } }
+  }
+  if (flagEmail !== undefined) return { _tag: "Resolved", identity: { name: mailboxName(flagEmail), email: flagEmail } }
+  return { _tag: "Unresolved" }
+}
 
 /** Pure resolution for `zwt new`: `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults. */
 export const resolveNew = (options: {
@@ -44,19 +91,10 @@ export const resolveNew = (options: {
 }): NewPlan => {
   const { config, flags, home, slug } = options
   const repoRoot = trimSlash(options.repoRoot)
-  const project = (config.project ?? []).find((p) => trimSlash(expandHome(p.path, home)) === repoRoot)
-  const profile = (config.profile ?? [])
-    .filter((p) => isUnder(repoRoot, profileRoot(p.match, home)))
-    .sort((a, b) => profileRoot(b.match, home).length - profileRoot(a.match, home).length)[0]
-
+  const { profile, project } = matchesFor(config, repoRoot, home)
   const base = pick(Option.getOrUndefined(flags.base), project?.base_branch, profile?.base_branch) ?? defaults.base_branch
   const prefix = pick(Option.getOrUndefined(flags.prefix), profile?.branch_prefix) ?? defaults.branch_prefix
-
-  const identityName = pick(project?.identity, profile?.identity)
-  const named = identityName === undefined ? undefined : config.identity[identityName]
-  const identity = named === undefined
-    ? Option.none<Identity>()
-    : Option.some({ name: named.name, email: project?.email ?? named.email })
+  const identity = resolveIdentity({ config, repoRoot, home, flags })
 
   const dir = expandHome(config.worktrees_dir ?? defaults.worktrees_dir, home)
   const parent = repoRoot.slice(0, repoRoot.lastIndexOf("/")) || "/"
