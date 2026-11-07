@@ -174,6 +174,18 @@ export class DoctorFailed extends Data.TaggedError("DoctorFailed")<{
   }
 }
 
+export class SyncFailed extends Data.TaggedError("SyncFailed")<{
+  readonly failed: number
+  readonly fixes: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `${this.failed} ${this.failed === 1 ? "repo was" : "repos were"} not fast-forwarded`
+  }
+  get fix() {
+    return this.fixes.join("\n  fix: ")
+  }
+}
+
 export class OverwriteRefused extends Data.TaggedError("OverwriteRefused")<{
   readonly file: string
 }> {
@@ -212,6 +224,7 @@ export type ZwtError =
   | DoctorFailed
   | InvalidSlug
   | OverwriteRefused
+  | SyncFailed
 
 const zwtTags = new Set<string>([
   "BranchNotFound",
@@ -228,7 +241,8 @@ const zwtTags = new Set<string>([
   "NotARepository",
   "DoctorFailed",
   "InvalidSlug",
-  "OverwriteRefused"
+  "OverwriteRefused",
+  "SyncFailed"
 ])
 
 export const isZwtError = <E>(u: E): u is Extract<E, ZwtError> =>

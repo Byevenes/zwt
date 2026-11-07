@@ -5,6 +5,7 @@ import { runDoctor } from "./commands/doctor.ts"
 import { checkIdentity, interactiveSession, listIdentities, setIdentity } from "./commands/identity.ts"
 import { initConfig } from "./commands/init.ts"
 import { newWorktree } from "./commands/new.ts"
+import { renderSyncTable, syncFailure, syncRepos } from "./commands/sync.ts"
 import { Config, defaultConfigPath } from "./services/Config.ts"
 import { DryRunLog, renderPlan } from "./services/DryRun.ts"
 import { dryRunFileSystem } from "./services/FileSystem.ts"
@@ -165,6 +166,23 @@ const doctorCommand = Command.make(
     }).pipe(reportPlan)
 ).pipe(Command.withDescription("audit identity, origin and hooks path"), Command.provide(services))
 
+const syncCommand = Command.make("sync", { config: configFlag }, ({ config }) =>
+  Effect.gen(function*() {
+    const rows = yield* Effect.gen(function*() {
+      const found = yield* syncRepos({
+        home: process.env.HOME ?? "~",
+        configFile: configFile(config)
+      })
+      yield* Console.log(renderSyncTable(found))
+      return found
+    }).pipe(reportPlan)
+    const failure = syncFailure(rows)
+    if (failure !== undefined) return yield* failure
+  })).pipe(
+  Command.withDescription("fetch and fast-forward the base branch of every configured repo"),
+  Command.provide(services)
+)
+
 const initCommand = Command.make(
   "init",
   {
@@ -199,7 +217,7 @@ const initCommand = Command.make(
 
 export const zwt = Command.make("zwt").pipe(
   Command.withDescription("git worktree helper"),
-  Command.withSubcommands([configCommand, newCommand, identityCommand, doctorCommand, initCommand]),
+  Command.withSubcommands([configCommand, newCommand, identityCommand, doctorCommand, syncCommand, initCommand]),
   Command.withGlobalFlags([DryRun])
 )
 

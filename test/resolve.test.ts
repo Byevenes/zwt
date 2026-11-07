@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
-import { expandHome, isValidSlug, matchingRemote, profileRoot, remoteIdentityClash, resolveExpectRemote, resolveIdentityKey, resolveNew } from "../src/resolve.ts"
+import { expandHome, isValidSlug, matchingRemote, profileRoot, remoteIdentityClash, resolveBase, resolveExpectRemote, resolveIdentityKey, resolveNew } from "../src/resolve.ts"
 import { parseConfig, type ZwtConfig } from "../src/services/Config.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
@@ -56,6 +56,15 @@ describe("resolveNew precedence: flag > project > profile > defaults", () => {
         flags: { ...none, base: Option.some("release"), prefix: Option.some("hotfix/") }
       })
       expect([fromFlags.base, fromFlags.branch]).toEqual(["release", "hotfix/x"])
+    }))
+
+  it.effect("resolveBase follows project, then profile, then main", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("valid.toml", source)
+      expect(resolveBase({ config, repoRoot: "/home/jane/work/acme/backend/api", home })).toBe("main")
+      expect(resolveBase({ config, repoRoot: "/home/jane/work/acme/web", home })).toBe("develop")
+      expect(resolveBase({ config, repoRoot: "/home/jane/personal/notes/", home })).toBe("main")
+      expect(resolveBase({ config, repoRoot: "/srv/other/tool", home })).toBe("main")
     }))
 
   it.effect("defaults apply and identity stays unresolved outside every profile", () =>
