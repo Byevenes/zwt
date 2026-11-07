@@ -113,6 +113,94 @@ describe("zwt.toml schema", () => {
       expect(config.identity.external?.email).toBe("jane.external@example.com")
     }))
 
+  it.effect("accepts a profile ticket pattern and branch template", () =>
+    Effect.gen(function*() {
+      const source = [
+        "version = 1",
+        "[identity.personal]",
+        'name = "Ada"',
+        'email = "ada@example.com"',
+        "[[profile]]",
+        'match = "~/work/**"',
+        'identity = "personal"',
+        'ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+"',
+        'branch_template = "feature/{ticket}-{slug}"'
+      ].join("\n")
+      const config = yield* parseConfig("ticket.toml", source)
+      expect(config.profile?.[0]?.ticket_pattern).toBe("[A-Z][A-Z0-9]+-[0-9]+")
+      expect(config.profile?.[0]?.branch_template).toBe("feature/{ticket}-{slug}")
+    }))
+
+  it.effect("rejects branch templates with unknown or unbalanced placeholders", () =>
+    Effect.gen(function*() {
+      const profile = (template: string) =>
+        [
+          "version = 1",
+          "[identity.personal]",
+          'name = "Ada"',
+          'email = "ada@example.com"',
+          "[[profile]]",
+          'match = "~/work/**"',
+          'identity = "personal"',
+          `branch_template = ${JSON.stringify(template)}`
+        ].join("\n")
+      const unknown = yield* Effect.flip(parseConfig("t.toml", profile("feature/{nope}")))
+      expect(unknown.issues[0]).toMatchObject({ path: "profile[0].branch_template", line: 8 })
+      expect(unknown.issues[0]?.message).toContain("{nope}")
+      const open = yield* Effect.flip(parseConfig("t.toml", profile("feature/{slug")))
+      expect(open.issues[0]?.message).toMatch(/unmatched brace/)
+      const close = yield* Effect.flip(parseConfig("t.toml", profile("feature/slug}")))
+      expect(close.issues[0]?.message).toMatch(/unmatched brace/)
+      const doubled = yield* Effect.flip(parseConfig("t.toml", profile("{{ticket}}")))
+      expect(doubled.issues[0]?.message).toContain("unknown placeholder {{ticket}")
+      const plain = yield* Effect.flip(parseConfig("t.toml", profile("feature/static")))
+      expect(plain.issues[0]?.message).toMatch(/must include/)
+    }))
+
+  it.effect("rejects ticket patterns that are not a non-empty regular expression", () =>
+    Effect.gen(function*() {
+      const profile = (pattern: string) =>
+        [
+          "version = 1",
+          "[identity.personal]",
+          'name = "Ada"',
+          'email = "ada@example.com"',
+          "[[profile]]",
+          'match = "~/work/**"',
+          'identity = "personal"',
+          `ticket_pattern = ${JSON.stringify(pattern)}`,
+          'branch_template = "{ticket}"'
+        ].join("\n")
+      const star = yield* Effect.flip(parseConfig("t.toml", profile("*")))
+      expect(star.issues[0]?.path).toBe("profile[0].ticket_pattern")
+      expect(star.issues[0]?.message).toMatch(/regular expression/)
+      const emptyMatch = yield* Effect.flip(parseConfig("t.toml", profile("A*")))
+      expect(emptyMatch.issues[0]?.message).toMatch(/empty ticket key/)
+      const blank = yield* Effect.flip(parseConfig("t.toml", profile("")))
+      expect(blank.issues[0]?.message).toMatch(/non-empty/)
+    }))
+
+  it.effect("rejects {ticket} when the profile has no ticket_pattern", () =>
+    Effect.gen(function*() {
+      const source = [
+        "version = 1",
+        "[identity.personal]",
+        'name = "Ada"',
+        'email = "ada@example.com"',
+        "[[profile]]",
+        'match = "~/work/**"',
+        'identity = "personal"',
+        'branch_template = "{prefix}{slug}"'
+      ].join("\n")
+      const withoutTicket = yield* parseConfig("t.toml", source)
+      expect(withoutTicket.profile?.[0]?.branch_template).toBe("{prefix}{slug}")
+      const error = yield* Effect.flip(parseConfig("t.toml", source.replace("{prefix}{slug}", "{ticket}-{slug}")))
+      expect(error.issues[0]).toMatchObject({
+        path: "profile[0].branch_template",
+        message: "placeholder {ticket} needs ticket_pattern on this profile"
+      })
+    }))
+
   it("resolves the XDG path with a ~/.config fallback", () => {
     expect(defaultConfigPath({ XDG_CONFIG_HOME: "/xdg", HOME: "/home/jane" })).toBe("/xdg/zwt/zwt.toml")
     expect(defaultConfigPath({ HOME: "/home/jane" })).toBe("/home/jane/.config/zwt/zwt.toml")

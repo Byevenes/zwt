@@ -197,6 +197,33 @@ export class OverwriteRefused extends Data.TaggedError("OverwriteRefused")<{
   }
 }
 
+export class TicketKeyNotFound extends Data.TaggedError("TicketKeyNotFound")<{
+  readonly slug: string
+  readonly pattern: string
+}> {
+  override get message() {
+    return this.pattern.length === 0
+      ? `branch template for "${this.slug}" uses {ticket} but the profile has no ticket_pattern`
+      : `slug "${this.slug}" does not start with a ticket key matching /${this.pattern}/`
+  }
+  get fix() {
+    return this.pattern.length === 0
+      ? "add ticket_pattern to the matching [[profile]] in zwt.toml"
+      : "start the slug with a key that matches ticket_pattern, for example: zwt new ABC-123-my-task"
+  }
+}
+
+export class EmptyBranchName extends Data.TaggedError("EmptyBranchName")<{
+  readonly slug: string
+}> {
+  override get message() {
+    return `branch template rendered an empty name for "${this.slug}"`
+  }
+  get fix() {
+    return "set branch_prefix, or include {ticket} or {slug} in branch_template"
+  }
+}
+
 export class InvalidSlug extends Data.TaggedError("InvalidSlug")<{
   readonly slug: string
 }> {
@@ -314,6 +341,8 @@ export type ZwtError =
   | NotARepository
   | DoctorFailed
   | InvalidSlug
+  | TicketKeyNotFound
+  | EmptyBranchName
   | OverwriteRefused
   | SyncFailed
   | PruneNeedsMerged
@@ -340,6 +369,8 @@ const zwtTags = new Set<string>([
   "NotARepository",
   "DoctorFailed",
   "InvalidSlug",
+  "TicketKeyNotFound",
+  "EmptyBranchName",
   "OverwriteRefused",
   "SyncFailed",
   "PruneNeedsMerged",

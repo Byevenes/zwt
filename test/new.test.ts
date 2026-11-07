@@ -9,6 +9,19 @@ import { Git } from "../src/services/Git.ts"
 import { Prompt } from "../src/services/Prompt.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
+const ticketSource = [
+  "version = 1",
+  "[identity.work]",
+  'name = "Jane Doe"',
+  'email = "jane.doe@example.com"',
+  "[[profile]]",
+  'match = "~/work/acme/**"',
+  'identity = "work"',
+  'base_branch = "develop"',
+  'branch_prefix = "feature/"',
+  'ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+"',
+  'branch_template = "feature/{ticket}-{slug}"'
+].join("\n")
 const configLayer = Config.live.pipe(Layer.provide(FileSystem.layerNoop({ readFileString: () => Effect.succeed(source) })))
 const repo = "/home/jane/work/acme/web"
 const options = (slug = "login") => ({
@@ -374,5 +387,72 @@ describe("zwt new with a fake Git layer", () => {
       expect(logged(yield* TestConsole.errorLines)).toBe("")
       expect(fake.calls.some((call) => call[0] === "worktree" && call[1] === "add")).toBe(false)
     }).pipe(Effect.provide(withRemote(fake)))
+  })
+
+  it.effect("creates the branch named by the profile template", () => {
+    const slug = "ABC-123"
+    const path = "/home/jane/work/acme/worktrees/web/ABC-123"
+    const fake = Git.fake({
+      ...baseResponses,
+      "worktree add -b feature/ABC-123 /home/jane/work/acme/worktrees/web/ABC-123 origin/develop": "",
+      "config --show-origin --get user.email": `file:${path}/.git/config.worktree\tjane.doe@example.com`
+    })
+    const config = Layer.succeed(Config, {
+      load: () => parseConfig("ticket.toml", ticketSource),
+      upsertProject: () => Effect.die("not saved")
+    })
+    return Effect.gen(function*() {
+      const result = yield* newWorktree(options(slug))
+      expect(result).toEqual({
+        _tag: "Created",
+        path,
+        branch: "feature/ABC-123",
+        base: "origin/develop",
+        email: "jane.doe@example.com"
+      })
+    }).pipe(Effect.provide(Layer.mergeAll(fake.layer, config, Prompt.scripted({}), excludeRecorder().layer)))
+  })
+
+  it.effect("does not fetch or create a worktree when the ticket key is missing", () => {
+    const fake = Git.fake({ "rev-parse --show-toplevel": repo })
+    const config = Layer.succeed(Config, {
+      load: () => parseConfig("ticket.toml", ticketSource),
+      upsertProject: () => Effect.die("not saved")
+    })
+    return Effect.gen(function*() {
+      const error = yield* Effect.flip(newWorktree(options("login")))
+      expect(error._tag).toBe("TicketKeyNotFound")
+      if (error._tag === "TicketKeyNotFound") {
+        expect(error.fix).toContain("zwt new ABC-123-my-task")
+        expect(error.message).toContain("/[A-Z][A-Z0-9]+-[0-9]+/")
+      }
+      expect(fake.calls.some((call) => call[0] === "fetch" || call[1] === "add")).toBe(false)
+    }).pipe(Effect.provide(Layer.mergeAll(fake.layer, config, Prompt.scripted({}), excludeRecorder().layer)))
+  })
+
+  it.effect("does not create a worktree when the template renders an empty branch", () => {
+    const fake = Git.fake({ "rev-parse --show-toplevel": repo })
+    const config = Layer.succeed(Config, {
+      load: () =>
+        parseConfig(
+          "empty.toml",
+          [
+            "version = 1",
+            "[identity.work]",
+            'name = "Jane Doe"',
+            'email = "jane.doe@example.com"',
+            "[[profile]]",
+            'match = "~/work/acme/**"',
+            'identity = "work"',
+            'branch_template = "{prefix}"'
+          ].join("\n")
+        ),
+      upsertProject: () => Effect.die("not saved")
+    })
+    return Effect.gen(function*() {
+      const error = yield* Effect.flip(newWorktree(options()))
+      expect(error._tag).toBe("EmptyBranchName")
+      expect(fake.calls.some((call) => call[0] === "fetch" || call[1] === "add")).toBe(false)
+    }).pipe(Effect.provide(Layer.mergeAll(fake.layer, config, Prompt.scripted({}), excludeRecorder().layer)))
   })
 })

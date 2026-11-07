@@ -2,7 +2,7 @@ import { Context, Effect, Exit, FileSystem, Layer, Schema } from "effect"
 import * as SchemaIssue from "effect/SchemaIssue"
 import { parse as parseToml, TomlError } from "smol-toml"
 import { type ConfigIssue, ConfigInvalid, ConfigNotFound } from "../errors.ts"
-import { expandHome } from "../resolve.ts"
+import { compileTicketPattern, expandHome } from "../resolve.ts"
 
 const tokenPatterns: ReadonlyArray<RegExp> = [
   /\bgh[pousr]_[A-Za-z0-9]{20,}/,
@@ -24,11 +24,47 @@ const Email = Text.check(Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { messag
 
 const Identity = Schema.Struct({ name: Text, email: Email })
 
+const ticketPatternMessage = (value: string): string | undefined => {
+  if (value.length === 0) return "must be a non-empty regular expression"
+  const compiled = compileTicketPattern(value)
+  if (compiled === undefined) return "must be a valid regular expression (* is a quantifier, not a glob)"
+  if (compiled.test("")) return "must not match an empty ticket key"
+  return undefined
+}
+
+/**
+ * Matched at the start of the slug. Not a substring, unlike `[[remote]].pattern`.
+ */
+const TicketPattern = Text.check(Schema.makeFilter((value: string) => ticketPatternMessage(value) ?? true))
+
+const placeholders = new Set(["ticket", "slug", "prefix"])
+
+const branchTemplateMessage = (value: string): string | undefined => {
+  if (value.length === 0) return "must not be empty"
+  let found = false
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i]
+    if (char !== "{" && char !== "}") continue
+    if (char === "}") return "has an unmatched brace; placeholders are {ticket}, {slug}, and {prefix}"
+    const end = value.indexOf("}", i + 1)
+    if (end < 0) return "has an unmatched brace; placeholders are {ticket}, {slug}, and {prefix}"
+    const name = value.slice(i + 1, end)
+    if (!placeholders.has(name)) return `unknown placeholder {${name}}; allowed: {ticket}, {slug}, {prefix}`
+    found = true
+    i = end
+  }
+  return found ? undefined : "must include {ticket}, {slug}, or {prefix}"
+}
+
+const BranchTemplate = Text.check(Schema.makeFilter((value: string) => branchTemplateMessage(value) ?? true))
+
 const Profile = Schema.Struct({
   match: Text,
   identity: Text,
   base_branch: Schema.optionalKey(Text),
   branch_prefix: Schema.optionalKey(Text),
+  ticket_pattern: Schema.optionalKey(TicketPattern),
+  branch_template: Schema.optionalKey(BranchTemplate),
   expect_remote: Schema.optionalKey(Text),
   guards: Schema.optionalKey(Schema.Array(Schema.Literals(["pre-commit", "pre-push"])))
 })
@@ -112,6 +148,17 @@ export const lineOf = (source: string, path: ReadonlyArray<PropertyKey>): number
 
 const formatter = SchemaIssue.makeFormatterStandardSchemaV1()
 
+const templateIssues = (config: ZwtConfig, source: string): ReadonlyArray<ConfigIssue> =>
+  (config.profile ?? []).flatMap((entry, index) => {
+    const template = entry.branch_template
+    if (template === undefined || !template.includes("{ticket}") || entry.ticket_pattern !== undefined) return []
+    return [{
+      path: `profile[${index}].branch_template`,
+      message: "placeholder {ticket} needs ticket_pattern on this profile",
+      line: lineOf(source, ["profile", index, "branch_template"])
+    }]
+  })
+
 const unknownIdentityIssues = (config: ZwtConfig, source: string): ReadonlyArray<ConfigIssue> => {
   const references = [
     ...(config.profile ?? []).map((entry, index) => ["profile", index, entry.identity] as const),
@@ -154,7 +201,7 @@ export const parseConfig = (file: string, source: string): Effect.Effect<ZwtConf
         : [{ path: "(root)", message: "invalid config" }]
       return yield* new ConfigInvalid({ file, issues })
     }
-    const crossIssues = unknownIdentityIssues(exit.value, source)
+    const crossIssues = [...unknownIdentityIssues(exit.value, source), ...templateIssues(exit.value, source)]
     if (crossIssues.length > 0) return yield* new ConfigInvalid({ file, issues: crossIssues })
     return exit.value
   })

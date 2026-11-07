@@ -186,4 +186,52 @@ describe("zwt new end to end (real git, temp HOME)", () => {
       git(repo, "remote", "set-url", "origin", previous)
     }
   })
+
+  it("names the branch from the ticket template, then reports it on re-run", () => {
+    const configPath = join(root, "ticket.toml")
+    writeFileSync(
+      configPath,
+      [
+        "version = 1",
+        "[identity.work]",
+        'name = "Jane Doe"',
+        'email = "jane@example.com"',
+        "[[profile]]",
+        'match = "~/work/acme/**"',
+        'identity = "work"',
+        'base_branch = "develop"',
+        'branch_prefix = "feature/"',
+        'ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+"',
+        'branch_template = "feature/{ticket}-{slug}"'
+      ].join("\n")
+    )
+    const key = "ABC-123"
+    const keyPath = join(home, "work", "acme", "worktrees", "web", key)
+    const created = zwt("new", key, "--config", configPath)
+    expect(created.stderr).toBe("")
+    expect(created.status).toBe(0)
+    expect(created.stdout).toContain(`created ${keyPath}`)
+    expect(created.stdout).toContain("branch feature/ABC-123 from origin/develop")
+    expect(git(keyPath, "branch", "--show-current")).toBe("feature/ABC-123")
+
+    const again = zwt("new", key, "--config", configPath)
+    expect(again.status).toBe(0)
+    expect(again.stdout).toContain(`exists ${keyPath}`)
+
+    const described = "ABC-456-fix-login"
+    const describedPath = join(home, "work", "acme", "worktrees", "web", described)
+    const withSlug = zwt("new", described, "--config", configPath)
+    expect(withSlug.status).toBe(0)
+    expect(git(describedPath, "branch", "--show-current")).toBe("feature/ABC-456-fix-login")
+
+    const missing = zwt("new", "notes", "--config", configPath)
+    expect(missing.status).toBe(1)
+    expect(missing.stderr).toContain("does not start with a ticket key")
+    expect(missing.stderr).toContain("fix:")
+    expect(existsSync(join(home, "work", "acme", "worktrees", "web", "notes"))).toBe(false)
+
+    const prefixed = zwt("new", "plain", "--prefix", "hotfix/", "--config", configPath)
+    expect(prefixed.status).toBe(0)
+    expect(git(join(home, "work", "acme", "worktrees", "web", "plain"), "branch", "--show-current")).toBe("hotfix/plain")
+  })
 })

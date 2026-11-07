@@ -43,6 +43,8 @@ bun run build                       # dist/zwt, one executable
 ./dist/zwt --dry-run config check   # prints planned writes instead of running them
 ./dist/zwt new login                # creates <prefix>login from the profile's base, under worktrees_dir
 ./dist/zwt new login --base main --prefix fix/
+./dist/zwt new ABC-123              # branch_template "feature/{ticket}-{slug}" → branch feature/ABC-123
+./dist/zwt new ABC-123-fix-login    # same template → branch feature/ABC-123-fix-login
 ./dist/zwt new login --identity personal
 ./dist/zwt new login --email pat@example.com
 ./dist/zwt --dry-run new login      # shows the fetch, worktree add and git config it would run
@@ -73,6 +75,8 @@ bun run build                       # dist/zwt, one executable
 ```
 
 `zwt new` resolves branch prefix, base and identity as `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults (`main`, no prefix, `worktrees`). `--email` and `--identity` are the identity flags. The worktree goes to `<repo parent>/<worktrees_dir>/<repo>/<slug>`. Re-running with the same slug prints the existing worktree.
+
+When that profile sets `branch_template`, the template names the branch. `{prefix}` is its `branch_prefix` (empty when unset). `{ticket}` is the leading match of `ticket_pattern`, a regular expression (`*` is a quantifier, not a glob; `[[remote]].pattern` stays a substring). `{slug}` is the rest of the argument, with one leading `-` or `_` removed. An empty `{slug}` or `{prefix}` drops one `-`, `_`, or `/` written next to it, so `branch_template = "feature/{ticket}-{slug}"` makes `zwt new ABC-123` the branch `feature/ABC-123` and `zwt new ABC-123-fix-login` the branch `feature/ABC-123-fix-login`. The directory still uses the whole slug. If the template contains `{ticket}` and the slug does not start with a match, the command stops before creating a worktree. With no template, the branch stays `<prefix><slug>` even when the slug looks like a ticket. `--prefix` skips the template and appends the whole slug to that prefix.
 
 When an identity resolves, `zwt new` enables `extensions.worktreeConfig` in the repo's local git config if needed, then sets `user.name` and `user.email` with `git config --worktree` inside the new worktree and checks that the effective email matches. It does not change `--global` git config. `includeIf` is not written.
 
@@ -107,7 +111,7 @@ An invalid config is rejected with the offending line and a suggested fix. See `
 
 ## Vision
 
-- **Profiles by folder.** A profile matches a folder (`~/work/acme/**`) and sets the base branch, branch prefix, and git identity for every repo under it.
+- **Profiles by folder.** A profile matches a folder (`~/work/acme/**`) and sets the base branch, branch prefix, optional branch template, and git identity for every repo under it.
 - **Identity outside worktrees.** `zwt` applies identity with worktree-local git config. Writing an `includeIf "gitdir:"` snippet is still planned. `zwt doctor` compares the effective email and does not write includeIf.
 - **Local guards, never versioned files.** Optional pre-commit/pre-push guards are not installed by `zwt doctor`. `info/exclude` entries are installed only in `.git/`, only after confirmation, by `zwt new`.
 - **Not in `zwt doctor` yet.** Base-branch freshness (`zwt sync` fast-forwards the base; doctor does not report it), bare-repo sanity, and installing local hooks.
@@ -148,6 +152,8 @@ match = "~/work/acme/**"
 identity = "work"
 base_branch = "develop"
 branch_prefix = "feature/"
+# ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+" # regex at the start of the slug; not a [[remote]] substring
+# branch_template = "feature/{ticket}-{slug}" # {ticket} {slug} {prefix}; omit to keep prefix + slug
 expect_remote = "gitlab.com:acme/"
 guards = ["pre-commit", "pre-push"]   # offered, installed only with confirmation
 
