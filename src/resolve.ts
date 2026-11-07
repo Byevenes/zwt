@@ -281,6 +281,78 @@ const nameBranch = (options: {
   return branch.length === 0 ? { _tag: "Empty" } : { _tag: "Ready", branch }
 }
 
+export type LaunchKind = "open" | "agent"
+
+/** `open` appends the worktree path. `agent` keeps the configured arguments and runs in that directory. */
+export const launchCommandKey = (kind: LaunchKind): "open_command" | "agent_command" => {
+  switch (kind) {
+    case "open":
+      return "open_command"
+    case "agent":
+      return "agent_command"
+    default: {
+      const exhaustive: never = kind
+      return exhaustive
+    }
+  }
+}
+
+/**
+ * Only the deepest matching profile is consulted, same as `branch_prefix`:
+ * a broader profile does not fill a missing `open_command` or `agent_command`.
+ */
+export const resolveLaunchCommand = (options: {
+  readonly config: ZwtConfig
+  readonly repoRoot: string
+  readonly home: string
+  readonly kind: LaunchKind
+}): string | undefined => {
+  const profile = matchesFor(options.config, trimSlash(options.repoRoot), options.home).profile
+  if (profile === undefined) return undefined
+  switch (options.kind) {
+    case "open":
+      return profile.open_command
+    case "agent":
+      return profile.agent_command
+    default: {
+      const exhaustive: never = options.kind
+      return exhaustive
+    }
+  }
+}
+
+/** Split on whitespace. No quotes and no shell. `open` appends the worktree path; `agent` does not. */
+export const launchArgv = (command: string, kind: LaunchKind, worktreePath: string): ReadonlyArray<string> => {
+  const argv = command.trim().split(/\s+/).filter((part) => part.length > 0)
+  switch (kind) {
+    case "open":
+      return [...argv, worktreePath]
+    case "agent":
+      return argv
+    default: {
+      const exhaustive: never = kind
+      return exhaustive
+    }
+  }
+}
+
+const quoteArg = (arg: string): string => /[\s"]/.test(arg) ? JSON.stringify(arg) : arg
+
+/** Text shown before the process runs. `agent` includes the working directory because it is not an argument. */
+export const formatLaunch = (kind: LaunchKind, argv: ReadonlyArray<string>, cwd: string): string => {
+  const command = argv.map(quoteArg).join(" ")
+  switch (kind) {
+    case "open":
+      return command
+    case "agent":
+      return `(cwd ${quoteArg(cwd)}) ${command}`
+    default: {
+      const exhaustive: never = kind
+      return exhaustive
+    }
+  }
+}
+
 /** Pure resolution for `zwt new`: `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults. */
 export const resolveNew = (options: {
   readonly config: ZwtConfig

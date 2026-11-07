@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Ref } from "effect"
 
 export interface PlannedWrite {
-  readonly kind: "git" | "fs"
+  readonly kind: "git" | "fs" | "exec"
   readonly description: string
 }
 

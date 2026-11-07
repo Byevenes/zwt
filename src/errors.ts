@@ -224,6 +224,59 @@ export class EmptyBranchName extends Data.TaggedError("EmptyBranchName")<{
   }
 }
 
+export class WorktreeNotFound extends Data.TaggedError("WorktreeNotFound")<{
+  readonly branch: string
+  readonly repo: string
+  readonly slug: string
+}> {
+  override get message() {
+    return `no worktree for branch "${this.branch}" in ${this.repo}`
+  }
+  get fix() {
+    return `zwt new ${this.slug}`
+  }
+}
+
+export type LaunchCommandKey = "open_command" | "agent_command"
+
+export class CommandUnset extends Data.TaggedError("CommandUnset")<{
+  readonly key: LaunchCommandKey
+  readonly repo: string
+  readonly file: string
+}> {
+  override get message() {
+    return `no ${this.key} for ${this.repo}`
+  }
+  get fix() {
+    return `set ${this.key} on the [[profile]] that matches ${this.repo} in ${this.file}`
+  }
+}
+
+export class CommandNotFound extends Data.TaggedError("CommandNotFound")<{
+  readonly command: string
+  readonly key: LaunchCommandKey
+  readonly file: string
+}> {
+  override get message() {
+    return `command not found: ${this.command}`
+  }
+  get fix() {
+    return `install "${this.command}", or set ${this.key} in ${this.file} to an executable on PATH`
+  }
+}
+
+export class CommandFailed extends Data.TaggedError("CommandFailed")<{
+  readonly command: string
+  readonly exitCode: number
+}> {
+  override get message() {
+    return `${this.command} failed (exit ${this.exitCode})`
+  }
+  get fix() {
+    return `run it by hand to inspect it: ${this.command}`
+  }
+}
+
 export class InvalidSlug extends Data.TaggedError("InvalidSlug")<{
   readonly slug: string
 }> {
@@ -353,6 +406,10 @@ export type ZwtError =
   | WorktreeMissing
   | MainWorktree
   | AmbiguousWorktree
+  | WorktreeNotFound
+  | CommandUnset
+  | CommandNotFound
+  | CommandFailed
 
 const zwtTags = new Set<string>([
   "BranchNotFound",
@@ -380,7 +437,11 @@ const zwtTags = new Set<string>([
   "WorktreeCurrent",
   "WorktreeMissing",
   "MainWorktree",
-  "AmbiguousWorktree"
+  "AmbiguousWorktree",
+  "WorktreeNotFound",
+  "CommandUnset",
+  "CommandNotFound",
+  "CommandFailed"
 ])
 
 export const isZwtError = <E>(u: E): u is Extract<E, ZwtError> =>

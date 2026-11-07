@@ -4,7 +4,7 @@ A small CLI for git worktrees. One command creates a worktree with the right bra
 
 Built with TypeScript + [Effect](https://effect.website), compiled with Bun to a single binary.
 
-> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt identity list|set|check`, `zwt doctor`, `zwt sync`, `zwt status`, `zwt init`, `zwt list`, `zwt prune --merged`, and `zwt rm <slug>`. The backlog lives in the issues.
+> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt open <slug>`, `zwt agent <slug>`, `zwt identity list|set|check`, `zwt doctor`, `zwt sync`, `zwt status`, `zwt init`, `zwt list`, `zwt prune --merged`, and `zwt rm <slug>`. The backlog lives in the issues.
 
 ## Install
 
@@ -48,6 +48,10 @@ bun run build                       # dist/zwt, one executable
 ./dist/zwt new login --identity personal
 ./dist/zwt new login --email pat@example.com
 ./dist/zwt --dry-run new login      # shows the fetch, worktree add and git config it would run
+./dist/zwt open login               # runs the profile open_command with the worktree path
+./dist/zwt agent login              # runs the profile agent_command in the worktree
+./dist/zwt new login --open         # create (or reuse), then run open_command
+./dist/zwt --dry-run open login     # prints the command, does not run it
 ./dist/zwt identity list
 ./dist/zwt identity set personal    # asks before writing a [[project]] entry
 ./dist/zwt identity check
@@ -99,6 +103,8 @@ Before creating a worktree, `zwt new` reads `origin`. When that URL contains a `
 `zwt prune --merged` removes linked worktrees that are clean and merged into that base. Dirty, unmerged, detached, locked, and missing worktrees stay. The worktree you are in stays. Without `--merged` it removes nothing and exits non-zero. `--delete-branch` deletes the local branch afterwards. The base branch is never deleted, and a branch that is not merged into the base is never deleted. `git branch -d` is used when the branch is contained in `HEAD`; a branch that is only in the base is deleted with `git branch -D`. `--dry-run` prints the removals and does not run them.
 
 `zwt rm <slug>` removes one linked worktree: the path `zwt new` would create, a folder named `<slug>`, or the branch `<prefix><slug>`. An exact `zwt new` path wins when several match. It refuses a dirty or unmerged worktree unless `--force` is passed. `--force` still refuses a locked worktree, the main checkout, and the directory you are in, and it does not delete an unmerged branch. `--delete-branch` follows the same rule as prune. A slug that matches nothing prints `absent` and exits zero.
+
+`zwt open <slug>` runs the deepest matching profile's `open_command` in the worktree and appends the worktree path as the last argument. `zwt agent <slug>` runs `agent_command` with that worktree as its working directory and does not append the path. The slug uses the same branch as `zwt new` without flags. The resolved command is printed before it runs. `--dry-run` prints it and does not run it. The value is an executable plus arguments separated by spaces, not a shell command. A missing executable is an error that names it. With no `open_command`, `zwt open` stops and `zwt new --open` stops before it creates a worktree. With no `agent_command`, `zwt agent` stops. The deepest profile does not inherit these keys from a broader one. `zwt new --open` runs the editor after the worktree is created, and also when that slug already exists.
 
 An invalid config is rejected with the offending line and a suggested fix. See `examples/zwt.toml` for a valid one.
 
@@ -156,6 +162,8 @@ branch_prefix = "feature/"
 # branch_template = "feature/{ticket}-{slug}" # {ticket} {slug} {prefix}; omit to keep prefix + slug
 expect_remote = "gitlab.com:acme/"
 guards = ["pre-commit", "pre-push"]   # offered, installed only with confirmation
+open_command = "editor"               # worktree path is appended; not a shell line
+agent_command = "agent"               # working directory is the worktree
 
 [[remote]]
 pattern = "github.com/other-org/"      # substring of the origin URL; longest match wins
@@ -170,7 +178,8 @@ email = "jane.ext@example.com"        # external email for this project only
 Precedence: `--flag` > `[[project]]` > most specific `[[profile]]` > global defaults.
 
 ```
-zwt new <slug> [--base <ref>] [--prefix <p>] [--email <addr>] [--identity <name>] [--strict] [--dry-run]
+zwt new <slug> [--base <ref>] [--prefix <p>] [--email <addr>] [--identity <name>] [--strict] [--open] [--dry-run]
+zwt open <slug> | zwt agent <slug>
 zwt identity list | set <name> [path] | check [path]
 zwt doctor [path] [--all] [--output text|json]
 zwt sync

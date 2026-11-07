@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
-import { expandHome, isValidSlug, matchingRemote, profileRoot, remoteIdentityClash, resolveBase, resolveExpectRemote, resolveIdentityKey, resolveNew, resolvePrefix, resolveWorktreePath } from "../src/resolve.ts"
+import { expandHome, formatLaunch, isValidSlug, launchArgv, matchingRemote, profileRoot, remoteIdentityClash, resolveBase, resolveExpectRemote, resolveIdentityKey, resolveLaunchCommand, resolveNew, resolvePrefix, resolveWorktreePath } from "../src/resolve.ts"
 import { parseConfig, type ZwtConfig } from "../src/services/Config.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
@@ -175,6 +175,37 @@ describe("resolveNew precedence: flag > project > profile > defaults", () => {
         `${source}\n[[profile]]\nmatch = "~/work/acme/backend/**"\nidentity = "work"\n`
       )
       expect(resolveExpectRemote({ config: deeper, repoRoot: "/home/jane/work/acme/backend/api", home })).toBeUndefined()
+    }))
+
+  it.effect("launch commands come from the deepest profile and are not a shell", () =>
+    Effect.gen(function*() {
+      const withCommand = source.replace(
+        'branch_prefix = "feature/"',
+        'branch_prefix = "feature/"\nopen_command = "editor --flag"\nagent_command = "agent"'
+      )
+      const config = yield* parseConfig("x.toml", withCommand)
+      const repoRoot = "/home/jane/work/acme/web"
+      expect(resolveLaunchCommand({ config, repoRoot, home, kind: "open" })).toBe("editor --flag")
+      expect(resolveLaunchCommand({ config, repoRoot, home, kind: "agent" })).toBe("agent")
+      expect(resolveLaunchCommand({ config, repoRoot: "/srv/other/tool", home, kind: "open" })).toBeUndefined()
+      const path = "/home/jane/work/acme/worktrees/web/login"
+      expect(launchArgv("editor --flag", "open", path)).toEqual(["editor", "--flag", path])
+      expect(launchArgv("agent", "agent", path)).toEqual(["agent"])
+      expect(launchArgv("editor && notify", "open", path)).toEqual(["editor", "&&", "notify", path])
+      expect(formatLaunch("open", ["editor", path], path)).toBe(`editor ${path}`)
+      expect(formatLaunch("agent", ["agent"], path)).toBe(`(cwd ${path}) agent`)
+      expect(formatLaunch("open", ["editor", "/tmp/my work"], "/tmp/my work")).toBe('editor "/tmp/my work"')
+      const deeper = yield* parseConfig(
+        "x.toml",
+        `${withCommand}\n[[profile]]\nmatch = "~/work/acme/web/**"\nidentity = "personal"\n`
+      )
+      expect(resolveLaunchCommand({ config: deeper, repoRoot, home, kind: "open" })).toBeUndefined()
+      const inner = yield* parseConfig(
+        "x.toml",
+        `${withCommand}\n[[profile]]\nmatch = "~/work/acme/web/**"\nidentity = "personal"\nopen_command = "inner"\n`
+      )
+      expect(resolveLaunchCommand({ config: inner, repoRoot, home, kind: "open" })).toBe("inner")
+      expect(resolveLaunchCommand({ config: inner, repoRoot, home, kind: "agent" })).toBeUndefined()
     }))
 
   it.effect("scratch_dir defaults to .scratch when the key is omitted", () =>

@@ -19,6 +19,8 @@ describe("zwt.toml schema", () => {
       const sketch = /```toml\n([\s\S]*?)```/.exec(readme)?.[1] ?? ""
       const config = yield* parseConfig("README.md", sketch)
       expect(config.project?.[0]?.email).toBe("jane.ext@example.com")
+      expect(config.profile?.[1]?.open_command).toBe("editor")
+      expect(config.profile?.[1]?.agent_command).toBe("agent")
     }))
 
   it.effect("reports schema issues with their TOML line", () =>
@@ -89,6 +91,27 @@ describe("zwt.toml schema", () => {
     })
   })
 
+  it.effect("accepts profile launch commands and rejects a blank one", () =>
+    Effect.gen(function*() {
+      const source = [
+        "version = 1",
+        "[identity.personal]",
+        'name = "Jane Doe"',
+        'email = "jane@example.com"',
+        "[[profile]]",
+        'match = "~/personal/**"',
+        'identity = "personal"',
+        'open_command = "editor --flag"',
+        'agent_command = "agent"'
+      ].join("\n")
+      const config = yield* parseConfig("launch.toml", source)
+      expect(config.profile?.[0]?.open_command).toBe("editor --flag")
+      expect(config.profile?.[0]?.agent_command).toBe("agent")
+      const blank = yield* Effect.flip(parseConfig("launch.toml", source.replace('open_command = "editor --flag"', 'open_command = "   "')))
+      expect(blank.issues[0]?.path).toBe("profile[0].open_command")
+      expect(blank.issues[0]?.message).toMatch(/executable/)
+    }))
+
   it.effect("rejects an empty [[remote]] pattern", () =>
     Effect.gen(function*() {
       const source = [
@@ -111,6 +134,8 @@ describe("zwt.toml schema", () => {
       const config = yield* parseConfig("examples/zwt.toml", example)
       expect(config.remote?.[0]).toEqual({ pattern: "github.com/other-org/", identity: "external" })
       expect(config.identity.external?.email).toBe("jane.external@example.com")
+      expect(config.profile?.[1]?.open_command).toBe("editor")
+      expect(config.profile?.[0]?.agent_command).toBeUndefined()
     }))
 
   it.effect("accepts a profile ticket pattern and branch template", () =>
