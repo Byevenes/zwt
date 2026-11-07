@@ -4,7 +4,7 @@ A small CLI for git worktrees. One command creates a worktree with the right bra
 
 Built with TypeScript + [Effect](https://effect.website), compiled with Bun to a single binary.
 
-> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt identity list|set|check`, `zwt doctor`, `zwt sync`, `zwt status`, and `zwt init`. `zwt list` and `zwt prune` are still planned. The backlog lives in the issues.
+> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt identity list|set|check`, `zwt doctor`, `zwt sync`, `zwt status`, `zwt init`, `zwt list`, `zwt prune --merged`, and `zwt rm <slug>`. The backlog lives in the issues.
 
 ## Install
 
@@ -63,6 +63,13 @@ bun run build                       # dist/zwt, one executable
 ./dist/zwt init                      # import includeIf identities, or write a personal starter
 ./dist/zwt init --yes                # write zwt.toml without prompting
 ./dist/zwt --dry-run init            # prints the zwt.toml it would write
+./dist/zwt list                      # path, branch, merged into the base, dirty
+./dist/zwt prune --merged            # remove clean worktrees merged into the base
+./dist/zwt prune --merged --delete-branch
+./dist/zwt --dry-run prune --merged  # prints the removals and does not run them
+./dist/zwt rm login                  # remove the worktree for that slug
+./dist/zwt rm login --force          # also remove a dirty or unmerged worktree
+./dist/zwt rm login --delete-branch
 ```
 
 `zwt new` resolves branch prefix, base and identity as `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults (`main`, no prefix, `worktrees`). `--email` and `--identity` are the identity flags. The worktree goes to `<repo parent>/<worktrees_dir>/<repo>/<slug>`. Re-running with the same slug prints the existing worktree.
@@ -82,6 +89,12 @@ Before creating a worktree, `zwt new` reads `origin`. When that URL contains a `
 `zwt status` prints one row per worktree: the checkout path, branch, configured base, commits ahead of and behind that base, whether the checkout is dirty, and whole days since the last activity. Activity is the later of the HEAD committer time and the newest path `git status` reports. The base is resolved from the repository's main worktree, the same way `zwt new` resolves it without `--base`: `[[project]]`, then the deepest `[[profile]]`, then `main`. Counts use that local ref and do not fetch. A missing base prints `?` and the command still exits zero. `--all` visits the same roots as `zwt doctor --all` and lists each repository once. `--output json` prints a document with `"version": 1`. The command does not write git config, the index, files, or `zwt.toml`.
 
 `zwt init` writes only `zwt.toml`. It imports each `includeIf "gitdir:..."` whose included file sets `user.email`. The identity key is that email's local-part, lowercased, with other characters folded into `-`; a second identity with the same key becomes `-2`, then `-3`. The gitdir path becomes `[[profile]] match` (`gitdir:~/personal/` is `~/personal/**`). An existing file is overwritten only after confirmation. Without a terminal the answer is no and the command exits non-zero. `--yes` skips the questions. With no includeIf identity, it writes one personal starter (`jane@example.com`, `~/personal/**`).
+
+`zwt list` prints one row per worktree: path, branch, whether that branch is an ancestor of the base (`[[project]]` > `[[profile]]` > `main`), and whether the worktree is dirty (`git status --porcelain`, including untracked files). Detached HEAD is not merged. A worktree whose directory is gone is `missing`, not clean. The main checkout is listed and is never removed.
+
+`zwt prune --merged` removes linked worktrees that are clean and merged into that base. Dirty, unmerged, detached, locked, and missing worktrees stay. The worktree you are in stays. Without `--merged` it removes nothing and exits non-zero. `--delete-branch` deletes the local branch afterwards. The base branch is never deleted, and a branch that is not merged into the base is never deleted. `git branch -d` is used when the branch is contained in `HEAD`; a branch that is only in the base is deleted with `git branch -D`. `--dry-run` prints the removals and does not run them.
+
+`zwt rm <slug>` removes one linked worktree: the path `zwt new` would create, a folder named `<slug>`, or the branch `<prefix><slug>`. An exact `zwt new` path wins when several match. It refuses a dirty or unmerged worktree unless `--force` is passed. `--force` still refuses a locked worktree, the main checkout, and the directory you are in, and it does not delete an unmerged branch. `--delete-branch` follows the same rule as prune. A slug that matches nothing prints `absent` and exits zero.
 
 An invalid config is rejected with the offending line and a suggested fix. See `examples/zwt.toml` for a valid one.
 
@@ -157,7 +170,9 @@ zwt doctor [path] [--all] [--output text|json]
 zwt sync
 zwt status [path] [--all] [--output text|json]
 zwt init [--yes] [--dry-run]
-zwt list | zwt prune [--merged] [--dry-run]
+zwt list
+zwt prune --merged [--delete-branch] [--dry-run]
+zwt rm <slug> [--force] [--delete-branch] [--dry-run]
 ```
 
 ## License

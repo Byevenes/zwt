@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
-import { expandHome, isValidSlug, matchingRemote, profileRoot, remoteIdentityClash, resolveBase, resolveExpectRemote, resolveIdentityKey, resolveNew } from "../src/resolve.ts"
+import { expandHome, isValidSlug, matchingRemote, profileRoot, remoteIdentityClash, resolveBase, resolveExpectRemote, resolveIdentityKey, resolveNew, resolvePrefix, resolveWorktreePath } from "../src/resolve.ts"
 import { parseConfig, type ZwtConfig } from "../src/services/Config.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
@@ -42,6 +42,20 @@ describe("resolveBase", () => {
         flags: { ...none, base: Option.some("release") }
       })
       expect(fromFlags.base).toBe("release")
+    }))
+})
+
+describe("base, prefix and worktree path", () => {
+  it.effect("follows project, then profile, then defaults", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("valid.toml", source)
+      const repoRoot = "/home/jane/work/acme/web"
+      expect(resolveBase({ config, repoRoot, home })).toBe("develop")
+      expect(resolvePrefix({ config, repoRoot, home })).toBe("feature/")
+      expect(resolveWorktreePath({ config, repoRoot, home, slug: "login" })).toBe("/home/jane/work/acme/worktrees/web/login")
+      expect(resolveBase({ config, repoRoot: "/home/jane/work/acme/backend/api", home })).toBe("main")
+      expect(resolveBase({ config, repoRoot: "/tmp/other", home })).toBe("main")
+      expect(resolvePrefix({ config, repoRoot: "/tmp/other", home })).toBe("")
     }))
 })
 
