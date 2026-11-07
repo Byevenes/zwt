@@ -8,6 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "effect-tsgo --tsrs-lint oxlint --type-aware --deny-warnings src test",
     "test": "bun --bun vitest run",
     "build": "bun build src/main.ts --compile --outfile dist/zwt"
   },
@@ -17,8 +18,10 @@
     "smol-toml": "1.9.1"
   },
   "devDependencies": {
+    "@effect/tsgo": "0.67.4",
     "@effect/vitest": "4.1.2",
     "@types/bun": "^1.4.4",
+    "oxlint": "1.91.0",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
   }
