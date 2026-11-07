@@ -22,6 +22,11 @@ const Text = Schema.String.check(
 
 const Email = Text.check(Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: "must be an email address" }))
 
+/** Executable plus arguments separated by whitespace. Not a shell line. */
+const CommandText = Text.check(
+  Schema.makeFilter((value: string) => value.trim().length > 0 ? true : "must name an executable")
+)
+
 const Identity = Schema.Struct({ name: Text, email: Email })
 
 const ticketPatternMessage = (value: string): string | undefined => {
@@ -66,7 +71,9 @@ const Profile = Schema.Struct({
   ticket_pattern: Schema.optionalKey(TicketPattern),
   branch_template: Schema.optionalKey(BranchTemplate),
   expect_remote: Schema.optionalKey(Text),
-  guards: Schema.optionalKey(Schema.Array(Schema.Literals(["pre-commit", "pre-push"])))
+  guards: Schema.optionalKey(Schema.Array(Schema.Literals(["pre-commit", "pre-push"]))),
+  open_command: Schema.optionalKey(CommandText),
+  agent_command: Schema.optionalKey(CommandText)
 })
 
 const Project = Schema.Struct({

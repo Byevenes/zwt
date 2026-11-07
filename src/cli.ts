@@ -4,7 +4,9 @@ import pkg from "../package.json" with { type: "json" }
 import { runDoctor } from "./commands/doctor.ts"
 import { checkIdentity, interactiveSession, listIdentities, setIdentity } from "./commands/identity.ts"
 import { initConfig } from "./commands/init.ts"
+import { finishOpen, launchInWorktree, prepareOpen } from "./commands/launch.ts"
 import { newWorktree } from "./commands/new.ts"
+import { type LaunchKind } from "./resolve.ts"
 import { runStatus } from "./commands/status.ts"
 import { renderSyncTable, syncFailure, syncRepos } from "./commands/sync.ts"
 import { listWorktrees, pruneMerged, removeWorktreeBySlug, renderList, renderPrune, renderRemoval, type RemovalVerbs } from "./commands/worktrees.ts"
@@ -12,15 +14,16 @@ import { Config, defaultConfigPath } from "./services/Config.ts"
 import { DryRunLog, renderPlan } from "./services/DryRun.ts"
 import { dryRunFileSystem } from "./services/FileSystem.ts"
 import { Git } from "./services/Git.ts"
+import { Launch } from "./services/Launch.ts"
 import { Prompt } from "./services/Prompt.ts"
 
 export const DryRun = GlobalFlag.Setting("dry-run")({
   flag: Flag.Boolean("dry-run").pipe(Flag.withDescription("print planned writes instead of running them"), Flag.withDefault(false))
 })
 
-const liveServices = Layer.mergeAll(Git.live, Config.live, Prompt.live, DryRunLog.layer)
+const liveServices = Layer.mergeAll(Git.live, Config.live, Prompt.live, Launch.live, DryRunLog.layer)
 
-const dryRunServices = Layer.mergeAll(Git.dryRun, Config.live, Prompt.live).pipe(
+const dryRunServices = Layer.mergeAll(Git.dryRun, Config.live, Prompt.live, Launch.dryRun).pipe(
   Layer.provideMerge(dryRunFileSystem),
   Layer.provideMerge(DryRunLog.layer)
 )
@@ -44,6 +47,32 @@ const reportPlan = <A, E, R>(self: Effect.Effect<A, E, R>) =>
 const configFlag = Flag.String("config").pipe(Flag.withDescription("path to zwt.toml"), Flag.optional)
 
 const configFile = (config: Option.Option<string>) => Option.getOrElse(config, () => defaultConfigPath(process.env))
+
+const launchVerb = (kind: LaunchKind, dry: boolean): string => {
+  switch (kind) {
+    case "open":
+      return dry ? "would open" : "opened"
+    case "agent":
+      return dry ? "would start" : "started"
+    default: {
+      const exhaustive: never = kind
+      return exhaustive
+    }
+  }
+}
+
+const launchDescription = (kind: LaunchKind): string => {
+  switch (kind) {
+    case "open":
+      return "run the profile open_command with the worktree path"
+    case "agent":
+      return "run the profile agent_command in the worktree"
+    default: {
+      const exhaustive: never = kind
+      return exhaustive
+    }
+  }
+}
 
 const configCheck = Command.make(
   "check",
@@ -82,15 +111,23 @@ const newCommand = Command.make(
       Flag.withDescription("fail when origin requires a different identity"),
       Flag.withDefault(false)
     ),
+    open: Flag.Boolean("open").pipe(
+      Flag.withDescription("run the profile open_command in the worktree"),
+      Flag.withDefault(false)
+    ),
     config: configFlag
   },
-  ({ base, config, email, identity, prefix, slug, strict }) =>
+  ({ base, config, email, identity, open, prefix, slug, strict }) =>
     Effect.gen(function*() {
+      const cwd = process.cwd()
+      const home = process.env.HOME ?? "~"
+      const file = configFile(config)
+      if (open) yield* prepareOpen({ slug, cwd, home, configFile: file })
       const result = yield* newWorktree({
         slug,
-        cwd: process.cwd(),
-        home: process.env.HOME ?? "~",
-        configFile: configFile(config),
+        cwd,
+        home,
+        configFile: file,
         interactive: interactiveSession(),
         flags: { base, prefix, email, identity },
         strict
@@ -100,8 +137,34 @@ const newCommand = Command.make(
           ? `exists ${result.path} (branch ${result.branch})`
           : `${(yield* DryRun) ? "would create" : "created"} ${result.path}\n  branch ${result.branch} from ${result.base}, identity ${result.email}`
       )
+      if (!open) return
+      yield* finishOpen({ cwd, home, configFile: file, worktreePath: result.path })
+      yield* Console.log(`${launchVerb("open", yield* DryRun)} ${result.path}`)
     }).pipe(reportPlan)
 ).pipe(Command.withDescription("create a worktree for <slug> from the profile's base branch"), Command.provide(services))
+
+const worktreeLaunch = (kind: LaunchKind) =>
+  Command.make(
+    kind,
+    {
+      slug: Argument.String("slug").pipe(Argument.withDescription("task slug; the branch matches zwt new without flags")),
+      config: configFlag
+    },
+    ({ config, slug }) =>
+      Effect.gen(function*() {
+        const result = yield* launchInWorktree({
+          kind,
+          slug,
+          cwd: process.cwd(),
+          home: process.env.HOME ?? "~",
+          configFile: configFile(config)
+        })
+        yield* Console.log(`${launchVerb(kind, yield* DryRun)} ${result.path}`)
+      }).pipe(reportPlan)
+  ).pipe(Command.withDescription(launchDescription(kind)), Command.provide(services))
+
+const openCommand = worktreeLaunch("open")
+const agentCommand = worktreeLaunch("agent")
 
 const identityList = Command.make("list", { config: configFlag }, ({ config }) =>
   listIdentities(configFile(config)).pipe(reportPlan)).pipe(
@@ -325,6 +388,8 @@ export const zwt = Command.make("zwt").pipe(
   Command.withSubcommands([
     configCommand,
     newCommand,
+    openCommand,
+    agentCommand,
     identityCommand,
     doctorCommand,
     syncCommand,
