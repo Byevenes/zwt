@@ -12,6 +12,8 @@ export type WorktreeHead =
 export interface WorktreeEntry {
   readonly path: string
   readonly head: WorktreeHead
+  readonly locked: boolean
+  readonly prunable: boolean
 }
 
 /** `global` is not a scope. This slice never writes it. */
@@ -52,7 +54,6 @@ export interface GitShape {
    */
   readonly fastForwardBranch: (branch: string, source: string, cwd: string) => Effect.Effect<void, GitCommandFailed>
   readonly worktreeForBranch: (branch: string, cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
-  /** Every worktree of the repo that owns `cwd`. Git prints the main worktree first. */
   readonly listWorktrees: (cwd: string) => Effect.Effect<ReadonlyArray<WorktreeEntry>, GitCommandFailed>
   /**
    * Commits the worktree is ahead of and behind `base`.
@@ -67,7 +68,7 @@ export interface GitShape {
   readonly statusPorcelain: (cwd: string) => Effect.Effect<string, GitCommandFailed>
   /** HEAD committer time, seconds since the epoch. `None` when the worktree has no commits. */
   readonly committerUnix: (cwd: string) => Effect.Effect<Option.Option<number>, GitCommandFailed>
-  /** `git rev-parse --git-common-dir`. May be relative to `cwd`. */
+  /** Absolute `git rev-parse --git-common-dir`. */
   readonly commonDir: (cwd: string) => Effect.Effect<string, GitCommandFailed>
   readonly addWorktree: (options: {
     readonly cwd: string
@@ -103,7 +104,9 @@ const headOf = (lines: ReadonlyArray<string>): WorktreeHead => {
   return { _tag: "Detached" }
 }
 
-/** Every worktree block in `git worktree list --porcelain`. The main worktree is first. */
+const worktreeFlag = (lines: ReadonlyArray<string>, name: string): boolean =>
+  lines.some((line) => line === name || line.startsWith(`${name} `))
+
 export const parseWorktrees = (porcelain: string): ReadonlyArray<WorktreeEntry> => {
   if (porcelain.trim() === "") return []
   const entries: Array<WorktreeEntry> = []
@@ -111,7 +114,12 @@ export const parseWorktrees = (porcelain: string): ReadonlyArray<WorktreeEntry> 
     const lines = block.split("\n").filter((line) => line.length > 0)
     const path = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length)
     if (path === undefined || path.length === 0) continue
-    entries.push({ path, head: headOf(lines) })
+    entries.push({
+      path,
+      head: headOf(lines),
+      locked: worktreeFlag(lines, "locked"),
+      prunable: worktreeFlag(lines, "prunable")
+    })
   }
   return entries
 }
@@ -209,7 +217,7 @@ const fromRunner = (read: GitShape["run"], write: GitShape["run"]): GitShape => 
       }),
       Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(Option.none()))
     ),
-  commonDir: (cwd) => read(["rev-parse", "--git-common-dir"], cwd),
+  commonDir: (cwd) => read(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd),
   addWorktree: ({ cwd, path, branch, base }) => write(["worktree", "add", "-b", branch, path, base], cwd).pipe(Effect.asVoid)
 })
 

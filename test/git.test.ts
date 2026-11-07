@@ -117,10 +117,10 @@ describe("fake Git layer", () => {
       "bare"
     ].join("\n")
     expect(parseWorktrees(porcelain)).toEqual([
-      { path: "/repo", head: { _tag: "Branch", name: "main" } },
-      { path: "/wt", head: { _tag: "Branch", name: "feature/login" } },
-      { path: "/det", head: { _tag: "Detached" } },
-      { path: "/bare.git", head: { _tag: "Bare" } }
+      { path: "/repo", head: { _tag: "Branch", name: "main" }, locked: false, prunable: false },
+      { path: "/wt", head: { _tag: "Branch", name: "feature/login" }, locked: true, prunable: false },
+      { path: "/det", head: { _tag: "Detached" }, locked: false, prunable: false },
+      { path: "/bare.git", head: { _tag: "Bare" }, locked: false, prunable: false }
     ])
     expect(parseWorktreeList(porcelain, "feature/login")).toEqual(Option.some("/wt"))
     expect(parseWorktreeList(porcelain, "missing")).toEqual(Option.none())

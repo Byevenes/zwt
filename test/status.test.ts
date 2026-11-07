@@ -69,7 +69,7 @@ const isReadOnly = (call: ReadonlyArray<string>) => {
     text.startsWith("rev-list --left-right --count ") ||
     text === statusArgs ||
     text === logArgs ||
-    text === "rev-parse --git-common-dir"
+    text === "rev-parse --path-format=absolute --git-common-dir"
 }
 
 const logged = (lines: ReadonlyArray<unknown>) => lines.map(String).join("\n")
@@ -281,9 +281,9 @@ const allResponses = {
   [key(missing, "rev-parse --show-toplevel")]: notRepo,
   [key("/home/jane/work/acme", "rev-parse --show-toplevel")]: notRepo,
   [key(wide, "rev-parse --show-toplevel")]: notRepo,
-  [key(repo, "rev-parse --git-common-dir")]: ".git",
-  [key(linked, "rev-parse --git-common-dir")]: `${repo}/.git`,
-  [key(notes, "rev-parse --git-common-dir")]: ".git",
+  [key(repo, "rev-parse --path-format=absolute --git-common-dir")]: `${repo}/.git`,
+  [key(linked, "rev-parse --path-format=absolute --git-common-dir")]: `${repo}/.git`,
+  [key(notes, "rev-parse --path-format=absolute --git-common-dir")]: `${notes}/.git`,
   [key(repo, "worktree list --porcelain")]: porcelain,
   [key(notes, "worktree list --porcelain")]: notesPorcelain,
   [key(repo, rev("release"))]: "0\t1",

@@ -1,7 +1,8 @@
 import { stat } from "node:fs/promises"
 import { join, resolve as resolvePath } from "node:path"
 import { Console, Effect, Option, Schema } from "effect"
-import { expandHome, profileRoot, resolveBase } from "../resolve.ts"
+import { configuredRepos } from "../repos.ts"
+import { expandHome, resolveBase } from "../resolve.ts"
 import { Config, type ZwtConfig } from "../services/Config.ts"
 import { Git, type WorktreeEntry, type WorktreeHead } from "../services/Git.ts"
 
@@ -172,47 +173,15 @@ const trimSlash = (path: string) => path.replace(/\/+$/, "")
 
 const normalizeFolder = (path: string, cwd: string, home: string) => trimSlash(resolvePath(cwd, expandHome(path, home)))
 
-/**
- * Same roots as `zwt doctor --all`: every `[[project]]` toplevel, plus a profile
- * match root only when that path is itself a git toplevel. A missing path is skipped.
- */
-const configuredRoots = (config: ZwtConfig, home: string) =>
-  Effect.gen(function*() {
-    const git = yield* Git
-    const seen = new Set<string>()
-    const roots: Array<string> = []
-    const add = (path: string) => {
-      if (seen.has(path)) return
-      seen.add(path)
-      roots.push(path)
-    }
-    for (const project of config.project ?? []) {
-      const path = trimSlash(expandHome(project.path, home))
-      const located = yield* git.repoRoot(path).pipe(
-        Effect.map((found) => trimSlash(found)),
-        Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(undefined))
-      )
-      if (located !== undefined) add(located)
-    }
-    for (const profile of config.profile ?? []) {
-      const root = profileRoot(profile.match, home)
-      if (seen.has(root)) continue
-      const toplevel = yield* git.repoRoot(root).pipe(
-        Effect.map((found) => trimSlash(found)),
-        Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(undefined))
-      )
-      if (toplevel === root) add(root)
-    }
-    return roots
-  })
-
 const allRows = (config: ZwtConfig, home: string, clock: Clock) =>
   Effect.gen(function*() {
     const git = yield* Git
     const seen = new Set<string>()
     const rows: Array<StatusWorktree> = []
-    for (const root of yield* configuredRoots(config, home)) {
-      const common = trimSlash(resolvePath(root, yield* git.commonDir(root)))
+    for (const found of yield* configuredRepos(config, home)) {
+      if (found._tag === "Absent") continue
+      const root = found.repo
+      const common = trimSlash(yield* git.commonDir(root))
       if (seen.has(common)) continue
       seen.add(common)
       rows.push(...(yield* rowsFor(root, config, home, clock)))
