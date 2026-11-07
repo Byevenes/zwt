@@ -5,6 +5,7 @@ import { runDoctor } from "./commands/doctor.ts"
 import { checkIdentity, interactiveSession, listIdentities, setIdentity } from "./commands/identity.ts"
 import { initConfig } from "./commands/init.ts"
 import { newWorktree } from "./commands/new.ts"
+import { runStatus } from "./commands/status.ts"
 import { renderSyncTable, syncFailure, syncRepos } from "./commands/sync.ts"
 import { Config, defaultConfigPath } from "./services/Config.ts"
 import { DryRunLog, renderPlan } from "./services/DryRun.ts"
@@ -183,6 +184,32 @@ const syncCommand = Command.make("sync", { config: configFlag }, ({ config }) =>
   Command.provide(services)
 )
 
+const statusCommand = Command.make(
+  "status",
+  {
+    all: Flag.Boolean("all").pipe(Flag.withDescription("list worktrees of every configured repo"), Flag.withDefault(false)),
+    output: Flag.Literals("output", ["text", "json"]).pipe(
+      Flag.withDescription("report format"),
+      Flag.withDefault("text" as const)
+    ),
+    path: Argument.String("path").pipe(Argument.withDescription("repo to inspect; default is this repo"), Argument.optional),
+    config: configFlag
+  },
+  ({ all, config, output, path }) =>
+    runStatus({
+      all,
+      output,
+      path,
+      cwd: process.cwd(),
+      home: process.env.HOME ?? "~",
+      configFile: configFile(config),
+      nowMs: Date.now()
+    }).pipe(reportPlan)
+).pipe(
+  Command.withDescription("show branch, ahead/behind base, dirty state, and days since activity"),
+  Command.provide(services)
+)
+
 const initCommand = Command.make(
   "init",
   {
@@ -217,7 +244,7 @@ const initCommand = Command.make(
 
 export const zwt = Command.make("zwt").pipe(
   Command.withDescription("git worktree helper"),
-  Command.withSubcommands([configCommand, newCommand, identityCommand, doctorCommand, syncCommand, initCommand]),
+  Command.withSubcommands([configCommand, newCommand, identityCommand, doctorCommand, syncCommand, statusCommand, initCommand]),
   Command.withGlobalFlags([DryRun])
 )
 

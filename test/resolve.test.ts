@@ -27,6 +27,24 @@ describe("paths", () => {
   })
 })
 
+describe("resolveBase", () => {
+  it.effect("matches zwt new when --base is absent", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("valid.toml", source)
+      expect(resolveBase({ config, repoRoot: "/home/jane/work/acme/backend/api", home })).toBe("main")
+      expect(resolveBase({ config, repoRoot: "/home/jane/work/acme/web", home })).toBe("develop")
+      expect(resolveBase({ config, repoRoot: "/srv/other/tool", home })).toBe("main")
+      const fromFlags = resolveNew({
+        config,
+        repoRoot: "/home/jane/work/acme/web",
+        slug: "x",
+        home,
+        flags: { ...none, base: Option.some("release") }
+      })
+      expect(fromFlags.base).toBe("release")
+    }))
+})
+
 describe("resolveNew precedence: flag > project > profile > defaults", () => {
   it.effect("profile sets prefix, base and identity", () =>
     Effect.gen(function*() {

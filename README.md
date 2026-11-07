@@ -4,7 +4,7 @@ A small CLI for git worktrees. One command creates a worktree with the right bra
 
 Built with TypeScript + [Effect](https://effect.website), compiled with Bun to a single binary.
 
-> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt identity list|set|check`, `zwt doctor`, `zwt init`, and `zwt sync`. `zwt list` and `zwt prune` are still planned. The backlog lives in the issues.
+> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt identity list|set|check`, `zwt doctor`, `zwt sync`, `zwt status`, and `zwt init`. `zwt list` and `zwt prune` are still planned. The backlog lives in the issues.
 
 ## Install
 
@@ -56,6 +56,10 @@ bun run build                       # dist/zwt, one executable
 ./dist/zwt --dry-run doctor         # reads only; prints that there is nothing to write
 ./dist/zwt sync                      # fast-forward each configured repo's base branch
 ./dist/zwt --dry-run sync            # print the summary and the fetches it would run
+./dist/zwt status                    # one row per worktree of this repo
+./dist/zwt status --all              # every configured repo
+./dist/zwt status --output json
+./dist/zwt --dry-run status          # reads only; prints that there is nothing to write
 ./dist/zwt init                      # import includeIf identities, or write a personal starter
 ./dist/zwt init --yes                # write zwt.toml without prompting
 ./dist/zwt --dry-run init            # prints the zwt.toml it would write
@@ -74,6 +78,8 @@ Before creating a worktree, `zwt new` reads `origin`. When that URL contains a `
 `zwt doctor` prints ok, warn, or fail for the effective email, the origin URL when the deepest profile sets `expect_remote`, whether that origin matches a `[[remote]]` that requires a different identity, and `core.hooksPath`. A fail exits non-zero and names a fix command. Warn alone exits zero. It does not write git config, files, hooks, or `zwt.toml`. `--all` uses the same checks for every `[[project]]` path and each `[[profile]]` match root that is itself a git toplevel. Unset `core.hooksPath` is ok. A set value is a warning. A `[[remote]]` identity mismatch is a failure. No origin, or an origin that matches no pattern, is ok. Base-branch freshness, bare-repo sanity, `includeIf`, and installing local hooks are not part of this command.
 
 `zwt sync` fetches `origin/<base>` and fast-forwards the local base branch for that same set of repos. The base is `[[project]]` `base_branch`, then the deepest matching profile, then `main`. The update is a fast-forward of the branch ref only. A diverged base is reported and left untouched, and the command exits non-zero. A base that is ahead of origin is reported and not reset. A base checked out in any worktree is not moved, so the working tree and uncommitted changes stay as they are; `origin/<base>` is still fetched. A missing local branch is reported and not created. No origin, a failed fetch, or a `[[project]]` path that is not a git repository also exits non-zero. Once the local base matches origin, a later run prints `up-to-date`. `--dry-run` prints the summary from the remote-tracking refs already on disk and lists the fetches it would run.
+
+`zwt status` prints one row per worktree: the checkout path, branch, configured base, commits ahead of and behind that base, whether the checkout is dirty, and whole days since the last activity. Activity is the later of the HEAD committer time and the newest path `git status` reports. The base is resolved from the repository's main worktree, the same way `zwt new` resolves it without `--base`: `[[project]]`, then the deepest `[[profile]]`, then `main`. Counts use that local ref and do not fetch. A missing base prints `?` and the command still exits zero. `--all` visits the same roots as `zwt doctor --all` and lists each repository once. `--output json` prints a document with `"version": 1`. The command does not write git config, the index, files, or `zwt.toml`.
 
 `zwt init` writes only `zwt.toml`. It imports each `includeIf "gitdir:..."` whose included file sets `user.email`. The identity key is that email's local-part, lowercased, with other characters folded into `-`; a second identity with the same key becomes `-2`, then `-3`. The gitdir path becomes `[[profile]] match` (`gitdir:~/personal/` is `~/personal/**`). An existing file is overwritten only after confirmation. Without a terminal the answer is no and the command exits non-zero. `--yes` skips the questions. With no includeIf identity, it writes one personal starter (`jane@example.com`, `~/personal/**`).
 
@@ -149,6 +155,7 @@ zwt new <slug> [--base <ref>] [--prefix <p>] [--email <addr>] [--identity <name>
 zwt identity list | set <name> [path] | check [path]
 zwt doctor [path] [--all] [--output text|json]
 zwt sync
+zwt status [path] [--all] [--output text|json]
 zwt init [--yes] [--dry-run]
 zwt list | zwt prune [--merged] [--dry-run]
 ```

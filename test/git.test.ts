@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
 import { GitCommandFailed } from "../src/errors.ts"
 import { DryRunLog } from "../src/services/DryRun.ts"
-import { Git, parseConfigOrigin } from "../src/services/Git.ts"
+import { Git, parseAheadBehind, parseConfigOrigin, parseWorktreeList, parseWorktrees } from "../src/services/Git.ts"
 
 const notFound = (args: ReadonlyArray<string>) => new GitCommandFailed({ args, exitCode: 1, stderr: "" })
 
@@ -95,6 +95,43 @@ describe("fake Git layer", () => {
       expect(fake.calls).toEqual([["fetch", "--quiet", ".", spec]])
       expect(fake.calls.some((call) => call.some((arg) => arg.startsWith("+") || arg === "--force"))).toBe(false)
     }).pipe(Effect.provide(fake.layer))
+  })
+
+  it("parses every worktree, and still finds one branch", () => {
+    const porcelain = [
+      "worktree /repo",
+      "HEAD aaa",
+      "branch refs/heads/main",
+      "",
+      "worktree /wt",
+      "HEAD bbb",
+      "branch refs/heads/feature/login",
+      "locked",
+      "",
+      "worktree /det",
+      "HEAD ccc",
+      "detached",
+      "",
+      "worktree /bare.git",
+      "HEAD ddd",
+      "bare"
+    ].join("\n")
+    expect(parseWorktrees(porcelain)).toEqual([
+      { path: "/repo", head: { _tag: "Branch", name: "main" } },
+      { path: "/wt", head: { _tag: "Branch", name: "feature/login" } },
+      { path: "/det", head: { _tag: "Detached" } },
+      { path: "/bare.git", head: { _tag: "Bare" } }
+    ])
+    expect(parseWorktreeList(porcelain, "feature/login")).toEqual(Option.some("/wt"))
+    expect(parseWorktreeList(porcelain, "missing")).toEqual(Option.none())
+    expect(parseWorktrees("")).toEqual([])
+  })
+
+  it("parses ahead/behind counts", () => {
+    expect(parseAheadBehind("1\t2")).toEqual(Option.some({ behind: 1, ahead: 2 }))
+    expect(parseAheadBehind("0 0\n")).toEqual(Option.some({ behind: 0, ahead: 0 }))
+    expect(parseAheadBehind("nope")).toEqual(Option.none())
+    expect(parseAheadBehind("-1\t2")).toEqual(Option.none())
   })
 
   it("parses git config --show-origin", () => {
