@@ -1,0 +1,5 @@
+# target	asset	os	arch
+bun-linux-x64	zwt-linux-x64	linux	x64
+bun-linux-arm64	zwt-linux-arm64	linux	arm64
+bun-darwin-x64	zwt-darwin-x64	darwin	x64
+bun-darwin-arm64	zwt-darwin-arm64	darwin	arm64
