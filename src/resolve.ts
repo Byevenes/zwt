@@ -155,6 +155,17 @@ export const remoteIdentityClash = (options: {
   return { pattern: match.pattern, required: match.identity, actual: "(unresolved)" }
 }
 
+/** `[[project]]` base, else the deepest profile, else `main`. Same rules as `zwt new` without `--base`. */
+export const resolveBase = (options: {
+  readonly config: ZwtConfig
+  readonly repoRoot: string
+  readonly home: string
+}): string => {
+  const repoRoot = trimSlash(options.repoRoot)
+  const { profile, project } = matchesFor(options.config, repoRoot, options.home)
+  return pick(project?.base_branch, profile?.base_branch) ?? defaults.base_branch
+}
+
 /** Pure resolution for `zwt new`: `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults. */
 export const resolveNew = (options: {
   readonly config: ZwtConfig
@@ -165,8 +176,8 @@ export const resolveNew = (options: {
 }): NewPlan => {
   const { config, flags, home, slug } = options
   const repoRoot = trimSlash(options.repoRoot)
-  const { profile, project } = matchesFor(config, repoRoot, home)
-  const base = pick(Option.getOrUndefined(flags.base), project?.base_branch, profile?.base_branch) ?? defaults.base_branch
+  const { profile } = matchesFor(config, repoRoot, home)
+  const base = Option.getOrUndefined(flags.base) ?? resolveBase({ config, repoRoot, home })
   const prefix = pick(Option.getOrUndefined(flags.prefix), profile?.branch_prefix) ?? defaults.branch_prefix
   const identity = resolveIdentity({ config, repoRoot, home, flags })
 

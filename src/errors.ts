@@ -174,6 +174,18 @@ export class DoctorFailed extends Data.TaggedError("DoctorFailed")<{
   }
 }
 
+export class SyncFailed extends Data.TaggedError("SyncFailed")<{
+  readonly failed: number
+  readonly fixes: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `${this.failed} ${this.failed === 1 ? "repo was" : "repos were"} not fast-forwarded`
+  }
+  get fix() {
+    return this.fixes.join("\n  fix: ")
+  }
+}
+
 export class OverwriteRefused extends Data.TaggedError("OverwriteRefused")<{
   readonly file: string
 }> {
@@ -210,6 +222,7 @@ export type ZwtError =
   | RemoteIdentityMismatch
   | NotARepository
   | DoctorFailed
+  | SyncFailed
   | InvalidSlug
   | OverwriteRefused
 
@@ -227,6 +240,7 @@ const zwtTags = new Set<string>([
   "RemoteIdentityMismatch",
   "NotARepository",
   "DoctorFailed",
+  "SyncFailed",
   "InvalidSlug",
   "OverwriteRefused"
 ])

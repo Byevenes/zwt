@@ -2,7 +2,8 @@ import { resolve as resolvePath } from "node:path"
 import { Console, Effect, Option } from "effect"
 import { DoctorFailed, IdentityMismatch, IdentityUnresolved, NotARepository, OriginMissing, RemoteIdentityMismatch, RemoteMismatch, UnknownIdentity } from "../errors.ts"
 import { includeIfHint } from "./identity.ts"
-import { expandHome, matchingRemote, profileRoot, remoteIdentityClash, resolveExpectRemote, resolveIdentity, resolveIdentityKey, type IdentityResolution } from "../resolve.ts"
+import { configuredRepos } from "../repos.ts"
+import { expandHome, matchingRemote, remoteIdentityClash, resolveExpectRemote, resolveIdentity, resolveIdentityKey, type IdentityResolution } from "../resolve.ts"
 import { Config, type ZwtConfig } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
 
@@ -152,46 +153,17 @@ const missingRepo = (path: string, file: string): RepoReport => {
   return { repo: path, currentEmail: "(unset)", expectedEmail: "(unresolved)", status: "fail", checks }
 }
 
-/**
- * Project paths are always rows. A path inside a repo is audited at that repo's toplevel.
- * A profile match root is a row only when `rev-parse --show-toplevel` is that path itself.
- */
 const collectRepos = (config: ZwtConfig, home: string, file: string) =>
   Effect.gen(function*() {
-    const git = yield* Git
-    const seen = new Set<string>()
+    const located = yield* configuredRepos(config, home)
     const reports: Array<RepoReport> = []
-    const remember = (path: string) => {
-      if (seen.has(path)) return false
-      seen.add(path)
-      return true
-    }
-
-    for (const project of config.project ?? []) {
-      const path = trimSlash(expandHome(project.path, home))
-      const located = yield* git.repoRoot(path).pipe(
-        Effect.map((root) => trimSlash(root)),
-        Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(undefined))
-      )
-      if (located === undefined) {
-        if (remember(path)) reports.push(missingRepo(path, file))
+    for (const entry of located) {
+      if (entry._tag === "Absent") {
+        reports.push(missingRepo(entry.path, file))
         continue
       }
-      if (!remember(located)) continue
-      reports.push(yield* auditRepo({ repo: located, config, configFile: file, home }))
+      reports.push(yield* auditRepo({ repo: entry.repo, config, configFile: file, home }))
     }
-
-    for (const profile of config.profile ?? []) {
-      const root = profileRoot(profile.match, home)
-      if (seen.has(root)) continue
-      const toplevel = yield* git.repoRoot(root).pipe(
-        Effect.map((found) => trimSlash(found)),
-        Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(undefined))
-      )
-      if (toplevel !== root || !remember(root)) continue
-      reports.push(yield* auditRepo({ repo: root, config, configFile: file, home }))
-    }
-
     return reports
   })
 

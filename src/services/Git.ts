@@ -32,6 +32,13 @@ export interface GitShape {
   readonly hasRemote: (remote: string, cwd: string) => Effect.Effect<boolean, GitCommandFailed>
   readonly originUrl: (cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
   readonly fetch: (remote: string, branch: string, cwd: string) => Effect.Effect<void, GitCommandFailed>
+  readonly commitOf: (ref: string, cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
+  readonly isAncestor: (ancestor: string, descendant: string, cwd: string) => Effect.Effect<boolean, GitCommandFailed>
+  /**
+   * Move `refs/heads/<branch>` to `source` only when that is a fast-forward.
+   * No leading `+`. Git refuses while the branch is checked out and leaves the working tree alone.
+   */
+  readonly fastForwardBranch: (branch: string, source: string, cwd: string) => Effect.Effect<void, GitCommandFailed>
   readonly worktreeForBranch: (branch: string, cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
   readonly addWorktree: (options: {
     readonly cwd: string
@@ -104,6 +111,18 @@ const fromRunner = (read: GitShape["run"], write: GitShape["run"]): GitShape => 
       Effect.catchIf((error) => error.exitCode === 2, () => Effect.succeed(Option.none()))
     ),
   fetch: (remote, branch, cwd) => write(["fetch", "--quiet", remote, branch], cwd).pipe(Effect.asVoid),
+  commitOf: (ref, cwd) =>
+    read(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], cwd).pipe(
+      Effect.map((oid) => oid.length === 0 ? Option.none() : Option.some(oid)),
+      Effect.catchIf((error) => error.exitCode === 1, () => Effect.succeed(Option.none()))
+    ),
+  isAncestor: (ancestor, descendant, cwd) =>
+    read(["merge-base", "--is-ancestor", ancestor, descendant], cwd).pipe(
+      Effect.as(true),
+      Effect.catchIf((error) => error.exitCode === 1, () => Effect.succeed(false))
+    ),
+  fastForwardBranch: (branch, source, cwd) =>
+    write(["fetch", "--quiet", ".", `${source}:refs/heads/${branch}`], cwd).pipe(Effect.asVoid),
   worktreeForBranch: (branch, cwd) =>
     read(["worktree", "list", "--porcelain"], cwd).pipe(Effect.map((out) => parseWorktreeList(out, branch))),
   addWorktree: ({ cwd, path, branch, base }) => write(["worktree", "add", "-b", branch, path, base], cwd).pipe(Effect.asVoid)

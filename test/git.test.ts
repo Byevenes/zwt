@@ -66,6 +66,37 @@ describe("fake Git layer", () => {
     }).pipe(Effect.provide(fake.layer))
   })
 
+  it.effect("commitOf returns the oid and treats a missing ref as none", () => {
+    const missing = ["rev-parse", "--verify", "--quiet", "refs/heads/nope^{commit}"]
+    const fake = Git.fake({
+      "rev-parse --verify --quiet refs/heads/main^{commit}": "abc",
+      [missing.join(" ")]: notFound(missing)
+    })
+    return Effect.gen(function*() {
+      const git = yield* Git
+      expect(yield* git.commitOf("refs/heads/main", "/repo")).toEqual(Option.some("abc"))
+      expect(yield* git.commitOf("refs/heads/nope", "/repo")).toEqual(Option.none())
+    }).pipe(Effect.provide(fake.layer))
+  })
+
+  it.effect("isAncestor is false when git exits 1", () => {
+    const args = ["merge-base", "--is-ancestor", "child", "parent"]
+    const fake = Git.fake({ [args.join(" ")]: notFound(args) })
+    return Effect.gen(function*() {
+      expect(yield* (yield* Git).isAncestor("child", "parent", "/repo")).toBe(false)
+    }).pipe(Effect.provide(fake.layer))
+  })
+
+  it.effect("fast-forwards with a local fetch and no force flag", () => {
+    const spec = "refs/remotes/origin/main:refs/heads/main"
+    const fake = Git.fake({ [`fetch --quiet . ${spec}`]: "" })
+    return Effect.gen(function*() {
+      yield* (yield* Git).fastForwardBranch("main", "refs/remotes/origin/main", "/repo")
+      expect(fake.calls).toEqual([["fetch", "--quiet", ".", spec]])
+      expect(fake.calls.some((call) => call.some((arg) => arg.startsWith("+") || arg === "--force"))).toBe(false)
+    }).pipe(Effect.provide(fake.layer))
+  })
+
   it("parses git config --show-origin", () => {
     expect(parseConfigOrigin("file:/repo/.git/worktrees/login/config.worktree\tada@example.com\n")).toEqual(
       Option.some({ file: "/repo/.git/worktrees/login/config.worktree", value: "ada@example.com" })
