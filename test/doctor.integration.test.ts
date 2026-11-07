@@ -10,7 +10,13 @@ const repo = join(root, "repo")
 const configPath = join(root, "zwt.toml")
 const main = new URL("../src/main.ts", import.meta.url).pathname
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")))
-const runEnv = { ...env, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), GIT_CONFIG_NOSYSTEM: "1" }
+const runEnv = {
+  ...env,
+  HOME: home,
+  XDG_CONFIG_HOME: join(home, ".config"),
+  XDG_STATE_HOME: join(home, ".local", "state"),
+  GIT_CONFIG_NOSYSTEM: "1"
+}
 const git = (cwd: string, ...args: Array<string>) => execFileSync("git", args, { cwd, env: runEnv, encoding: "utf8" }).trim()
 const zwt = (...args: Array<string>) => spawnSync(process.execPath, [main, ...args], { cwd: repo, env: runEnv, encoding: "utf8" })
 const localList = () => git(repo, "config", "--local", "--list")

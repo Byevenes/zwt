@@ -10,7 +10,13 @@ const configPath = join(root, "out", "zwt.toml")
 const gitconfig = join(home, ".gitconfig")
 const main = new URL("../src/main.ts", import.meta.url).pathname
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")))
-const runEnv = { ...env, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), GIT_CONFIG_NOSYSTEM: "1" }
+const runEnv = {
+  ...env,
+  HOME: home,
+  XDG_CONFIG_HOME: join(home, ".config"),
+  XDG_STATE_HOME: join(home, ".local", "state"),
+  GIT_CONFIG_NOSYSTEM: "1"
+}
 const zwt = (...args: Array<string>) => spawnSync(process.execPath, [main, ...args], { cwd: root, env: runEnv, encoding: "utf8" })
 
 const personal = [
@@ -91,7 +97,12 @@ describe("zwt init end to end (temp HOME)", () => {
     const starter = join(root, "starter.toml")
     const result = spawnSync(process.execPath, [main, "init", "--config", starter], {
       cwd: root,
-      env: { ...runEnv, HOME: emptyHome, XDG_CONFIG_HOME: join(emptyHome, ".config") },
+      env: {
+        ...runEnv,
+        HOME: emptyHome,
+        XDG_CONFIG_HOME: join(emptyHome, ".config"),
+        XDG_STATE_HOME: join(emptyHome, ".local", "state")
+      },
       encoding: "utf8"
     })
     expect(result.status).toBe(0)

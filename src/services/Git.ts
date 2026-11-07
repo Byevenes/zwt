@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process"
 import { Context, Effect, Layer, Option, Ref } from "effect"
+import { actionResult } from "../action-log.ts"
 import { BranchNotFound, GitCommandFailed } from "../errors.ts"
+import { ActionLog } from "./ActionLog.ts"
 import { DryRunLog } from "./DryRun.ts"
 
 /** What `git worktree list --porcelain` says the checkout is. */
@@ -248,6 +250,22 @@ const fromRunner = (read: GitShape["run"], write: GitShape["run"]): GitShape => 
 
 export class Git extends Context.Service<Git, GitShape>()("zwt/Git") {
   static readonly live = Layer.succeed(Git, fromRunner(exec, exec))
+
+  /** Same git binary as `live`. Each write is appended to the local action log; reads are not. */
+  static readonly logging = Layer.effect(
+    Git,
+    Effect.gen(function*() {
+      const actions = yield* ActionLog
+      const write: GitShape["run"] = (args, cwd) => {
+        const command = `git -C ${cwd} ${args.join(" ")}`
+        return exec(args, cwd).pipe(
+          Effect.tap(() => actions.record({ command, result: "ok" })),
+          Effect.tapError((error) => actions.record({ command, result: actionResult(error) }))
+        )
+      }
+      return fromRunner(exec, write)
+    })
+  )
 
   static readonly dryRun = Layer.effect(
     Git,
