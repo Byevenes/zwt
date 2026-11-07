@@ -3,6 +3,19 @@ import { Context, Effect, Layer, Option, Ref } from "effect"
 import { BranchNotFound, GitCommandFailed } from "../errors.ts"
 import { DryRunLog } from "./DryRun.ts"
 
+/** What `git worktree list --porcelain` says the checkout is. */
+export type WorktreeHead =
+  | { readonly _tag: "Branch"; readonly name: string }
+  | { readonly _tag: "Detached" }
+  | { readonly _tag: "Bare" }
+
+export interface WorktreeEntry {
+  readonly path: string
+  readonly head: WorktreeHead
+  readonly locked: boolean
+  readonly prunable: boolean
+}
+
 /** `global` is not a scope. This slice never writes it. */
 export type GitConfigScope = "local" | "worktree"
 
@@ -41,6 +54,22 @@ export interface GitShape {
    */
   readonly fastForwardBranch: (branch: string, source: string, cwd: string) => Effect.Effect<void, GitCommandFailed>
   readonly worktreeForBranch: (branch: string, cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
+  readonly listWorktrees: (cwd: string) => Effect.Effect<ReadonlyArray<WorktreeEntry>, GitCommandFailed>
+  /**
+   * Commits the worktree is ahead of and behind `base`.
+   * `git rev-list --left-right --count base...HEAD`: the left count is behind, the right count is ahead.
+   * A missing base (exit 128) is `None`. This does not fetch.
+   */
+  readonly aheadBehind: (
+    base: string,
+    cwd: string
+  ) => Effect.Effect<Option.Option<{ readonly ahead: number; readonly behind: number }>, GitCommandFailed>
+  /** `git status --porcelain=v1 -z`, without taking the index lock. A bare checkout is an empty string. */
+  readonly statusPorcelain: (cwd: string) => Effect.Effect<string, GitCommandFailed>
+  /** HEAD committer time, seconds since the epoch. `None` when the worktree has no commits. */
+  readonly committerUnix: (cwd: string) => Effect.Effect<Option.Option<number>, GitCommandFailed>
+  /** Absolute `git rev-parse --git-common-dir`. */
+  readonly commonDir: (cwd: string) => Effect.Effect<string, GitCommandFailed>
   readonly addWorktree: (options: {
     readonly cwd: string
     readonly path: string
@@ -64,13 +93,54 @@ const exec = (args: ReadonlyArray<string>, cwd: string) =>
     })
   })
 
-export const parseWorktreeList = (porcelain: string, branch: string): Option.Option<string> => {
-  for (const block of porcelain.split("\n\n")) {
-    const lines = block.split("\n")
-    const path = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length)
-    if (path !== undefined && lines.includes(`branch refs/heads/${branch}`)) return Option.some(path)
+const headOf = (lines: ReadonlyArray<string>): WorktreeHead => {
+  const branch = lines.find((line) => line.startsWith("branch "))
+  if (branch !== undefined) {
+    const ref = branch.slice("branch ".length)
+    const name = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref
+    return { _tag: "Branch", name }
   }
-  return Option.none()
+  if (lines.includes("bare")) return { _tag: "Bare" }
+  return { _tag: "Detached" }
+}
+
+const worktreeFlag = (lines: ReadonlyArray<string>, name: string): boolean =>
+  lines.some((line) => line === name || line.startsWith(`${name} `))
+
+export const parseWorktrees = (porcelain: string): ReadonlyArray<WorktreeEntry> => {
+  if (porcelain.trim() === "") return []
+  const entries: Array<WorktreeEntry> = []
+  for (const block of porcelain.split("\n\n")) {
+    const lines = block.split("\n").filter((line) => line.length > 0)
+    const path = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length)
+    if (path === undefined || path.length === 0) continue
+    entries.push({
+      path,
+      head: headOf(lines),
+      locked: worktreeFlag(lines, "locked"),
+      prunable: worktreeFlag(lines, "prunable")
+    })
+  }
+  return entries
+}
+
+export const parseWorktreeList = (porcelain: string, branch: string): Option.Option<string> => {
+  const found = parseWorktrees(porcelain).find((entry) => entry.head._tag === "Branch" && entry.head.name === branch)
+  return found === undefined ? Option.none() : Option.some(found.path)
+}
+
+/** Left count is behind `base`, right count is ahead. Anything else is not a count. */
+export const parseAheadBehind = (
+  output: string
+): Option.Option<{ readonly ahead: number; readonly behind: number }> => {
+  const parts = output.trim().split(/\s+/)
+  const behindRaw = parts[0]
+  const aheadRaw = parts[1]
+  if (behindRaw === undefined || aheadRaw === undefined || parts.length !== 2) return Option.none()
+  const behind = Number(behindRaw)
+  const ahead = Number(aheadRaw)
+  if (!Number.isInteger(behind) || !Number.isInteger(ahead) || behind < 0 || ahead < 0) return Option.none()
+  return Option.some({ ahead, behind })
 }
 
 /** Reads always run `read`; anything that changes the repo goes through `write`. */
@@ -126,6 +196,28 @@ const fromRunner = (read: GitShape["run"], write: GitShape["run"]): GitShape => 
     write(["fetch", "--quiet", ".", `${source}:refs/heads/${branch}`], cwd).pipe(Effect.asVoid),
   worktreeForBranch: (branch, cwd) =>
     read(["worktree", "list", "--porcelain"], cwd).pipe(Effect.map((out) => parseWorktreeList(out, branch))),
+  listWorktrees: (cwd) => read(["worktree", "list", "--porcelain"], cwd).pipe(Effect.map(parseWorktrees)),
+  aheadBehind: (base, cwd) =>
+    read(["rev-list", "--left-right", "--count", `${base}...HEAD`], cwd).pipe(
+      Effect.map(parseAheadBehind),
+      Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(Option.none()))
+    ),
+  statusPorcelain: (cwd) =>
+    read(["--no-optional-locks", "status", "--porcelain=v1", "-z"], cwd).pipe(
+      Effect.catchIf(
+        (error) => error.exitCode === 128 && error.stderr.toLowerCase().includes("work tree"),
+        () => Effect.succeed("")
+      )
+    ),
+  committerUnix: (cwd) =>
+    read(["log", "-1", "--format=%ct"], cwd).pipe(
+      Effect.map((out) => {
+        const seconds = Number(out.trim())
+        return Number.isInteger(seconds) ? Option.some(seconds) : Option.none()
+      }),
+      Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(Option.none()))
+    ),
+  commonDir: (cwd) => read(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd),
   addWorktree: ({ cwd, path, branch, base }) => write(["worktree", "add", "-b", branch, path, base], cwd).pipe(Effect.asVoid)
 })
 
