@@ -6,7 +6,24 @@ Built with TypeScript + [Effect](https://effect.website), compiled with Bun to a
 
 > **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt identity list|set|check`, `zwt doctor`, and `zwt init`. `zwt list` and `zwt prune` are still planned. The backlog lives in the issues.
 
-## Install (from source)
+## Install
+
+A tag `vX.Y.Z` (the same version as `package.json`) publishes four binaries and `checksums.txt` (SHA-256) to [GitHub Releases](https://github.com/Byevenes/zwt/releases). The installer picks the binary for this machine and checks that sum. It is POSIX `sh` and uses `curl` or `wget`, plus `sha256sum` or `shasum`.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Byevenes/zwt/main/install.sh | sh
+```
+
+The binary is installed to `~/.local/bin/zwt`. Add that directory to `PATH` when the script says it is missing. Pin a release, or preview the download, with:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Byevenes/zwt/main/install.sh | sh -s -- --version v0.1.0
+curl -fsSL https://raw.githubusercontent.com/Byevenes/zwt/main/install.sh | sh -s -- --dry-run
+```
+
+Assets: `zwt-linux-x64`, `zwt-linux-arm64` (glibc), `zwt-darwin-arm64`, `zwt-darwin-x64`. macOS builds are not notarized. `--dir` chooses the install directory.
+
+### From source
 
 Requires [Bun](https://bun.sh) 1.4.2 or newer.
 

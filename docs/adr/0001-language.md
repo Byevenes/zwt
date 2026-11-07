@@ -30,5 +30,5 @@ zwt is a small personal CLI that mostly shells out to git. The candidates were G
 
 ## Install
 
-- Today: `bun install && bun run build` produces `dist/zwt`; copy it onto your `PATH`.
-- Later: prebuilt binaries on GitHub Releases plus a one-line installer (#26).
+- From source: `bun install && bun run build` produces `dist/zwt`; copy it onto your `PATH`.
+- GitHub Releases (#26): pushing a tag `vX.Y.Z` that matches `package.json` builds four Bun binaries (`bun-linux-x64`, `bun-linux-arm64`, `bun-darwin-x64`, `bun-darwin-arm64`) and publishes them with a SHA-256 `checksums.txt`. `install.sh` is POSIX `sh`: it downloads the matching asset and refuses to install when the sum does not match. Linux binaries are glibc. macOS binaries are not notarized. `workflow_dispatch` builds the artifacts and does not publish.
