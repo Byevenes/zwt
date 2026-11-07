@@ -166,6 +166,31 @@ export const resolveBase = (options: {
   return pick(project?.base_branch, profile?.base_branch) ?? defaults.base_branch
 }
 
+/** Deepest matching profile's prefix, or none. The project table has no prefix. */
+export const resolvePrefix = (options: {
+  readonly config: ZwtConfig
+  readonly repoRoot: string
+  readonly home: string
+}): string => {
+  const { profile } = matchesFor(options.config, trimSlash(options.repoRoot), options.home)
+  return profile?.branch_prefix ?? defaults.branch_prefix
+}
+
+/** `<repo parent>/<worktrees_dir>/<repo>/<slug>`, the same folder `zwt new` creates. */
+export const resolveWorktreePath = (options: {
+  readonly config: ZwtConfig
+  readonly repoRoot: string
+  readonly home: string
+  readonly slug: string
+}): string => {
+  const repoRoot = trimSlash(options.repoRoot)
+  const dir = expandHome(options.config.worktrees_dir ?? defaults.worktrees_dir, options.home)
+  const parent = repoRoot.slice(0, repoRoot.lastIndexOf("/")) || "/"
+  const repoName = repoRoot.slice(repoRoot.lastIndexOf("/") + 1)
+  const root = dir.startsWith("/") ? trimSlash(dir) : `${parent === "/" ? "" : parent}/${trimSlash(dir)}`
+  return `${root}/${repoName}/${options.slug}`
+}
+
 /** Pure resolution for `zwt new`: `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults. */
 export const resolveNew = (options: {
   readonly config: ZwtConfig
@@ -176,20 +201,16 @@ export const resolveNew = (options: {
 }): NewPlan => {
   const { config, flags, home, slug } = options
   const repoRoot = trimSlash(options.repoRoot)
-  const { profile } = matchesFor(config, repoRoot, home)
-  const base = Option.getOrUndefined(flags.base) ?? resolveBase({ config, repoRoot, home })
-  const prefix = pick(Option.getOrUndefined(flags.prefix), profile?.branch_prefix) ?? defaults.branch_prefix
+  const flaggedBase = Option.getOrUndefined(flags.base)
+  const flaggedPrefix = Option.getOrUndefined(flags.prefix)
+  const base = flaggedBase !== undefined ? flaggedBase : resolveBase({ config, repoRoot, home })
+  const prefix = flaggedPrefix !== undefined ? flaggedPrefix : resolvePrefix({ config, repoRoot, home })
   const identity = resolveIdentity({ config, repoRoot, home, flags })
-
-  const dir = expandHome(config.worktrees_dir ?? defaults.worktrees_dir, home)
-  const parent = repoRoot.slice(0, repoRoot.lastIndexOf("/")) || "/"
-  const repoName = repoRoot.slice(repoRoot.lastIndexOf("/") + 1)
-  const root = dir.startsWith("/") ? trimSlash(dir) : `${parent === "/" ? "" : parent}/${trimSlash(dir)}`
 
   return {
     branch: `${prefix}${slug}`,
     base,
-    worktreePath: `${root}/${repoName}/${slug}`,
+    worktreePath: resolveWorktreePath({ config, repoRoot, home, slug }),
     scratchDir: config.scratch_dir ?? defaults.scratch_dir,
     identity
   }

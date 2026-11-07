@@ -7,6 +7,7 @@ import { initConfig } from "./commands/init.ts"
 import { newWorktree } from "./commands/new.ts"
 import { runStatus } from "./commands/status.ts"
 import { renderSyncTable, syncFailure, syncRepos } from "./commands/sync.ts"
+import { listWorktrees, pruneMerged, removeWorktreeBySlug, renderList, renderPrune, renderRemoval, type RemovalVerbs } from "./commands/worktrees.ts"
 import { Config, defaultConfigPath } from "./services/Config.ts"
 import { DryRunLog, renderPlan } from "./services/DryRun.ts"
 import { dryRunFileSystem } from "./services/FileSystem.ts"
@@ -210,6 +211,78 @@ const statusCommand = Command.make(
   Command.provide(services)
 )
 
+const removalVerbs = (dry: boolean): RemovalVerbs => ({
+  removed: dry ? "would remove" : "removed",
+  deleted: dry ? "would delete branch" : "deleted branch"
+})
+
+const listCommand = Command.make("list", { config: configFlag }, ({ config }) =>
+  Effect.gen(function*() {
+    const rows = yield* listWorktrees({
+      cwd: process.cwd(),
+      home: process.env.HOME ?? "~",
+      configFile: configFile(config)
+    })
+    yield* Console.log(renderList(rows))
+  }).pipe(reportPlan)).pipe(
+  Command.withDescription("list worktrees with branch, merged and dirty"),
+  Command.provide(services)
+)
+
+const pruneCommand = Command.make(
+  "prune",
+  {
+    merged: Flag.Boolean("merged").pipe(
+      Flag.withDescription("remove clean worktrees whose branch is merged into the base"),
+      Flag.withDefault(false)
+    ),
+    deleteBranch: Flag.Boolean("delete-branch").pipe(
+      Flag.withDescription("delete the local branch after removing its worktree"),
+      Flag.withDefault(false)
+    ),
+    config: configFlag
+  },
+  ({ config, deleteBranch, merged }) =>
+    Effect.gen(function*() {
+      const items = yield* pruneMerged({
+        cwd: process.cwd(),
+        home: process.env.HOME ?? "~",
+        configFile: configFile(config),
+        merged,
+        deleteBranch
+      })
+      yield* Console.log(renderPrune(items, removalVerbs(yield* DryRun)))
+    }).pipe(reportPlan)
+).pipe(Command.withDescription("remove clean worktrees merged into the base"), Command.provide(services))
+
+const rmCommand = Command.make(
+  "rm",
+  {
+    slug: Argument.String("slug").pipe(Argument.withDescription("task slug of the worktree to remove")),
+    force: Flag.Boolean("force").pipe(
+      Flag.withDescription("remove a dirty or unmerged worktree"),
+      Flag.withDefault(false)
+    ),
+    deleteBranch: Flag.Boolean("delete-branch").pipe(
+      Flag.withDescription("delete the local branch after removing its worktree"),
+      Flag.withDefault(false)
+    ),
+    config: configFlag
+  },
+  ({ config, deleteBranch, force, slug }) =>
+    Effect.gen(function*() {
+      const result = yield* removeWorktreeBySlug({
+        slug,
+        cwd: process.cwd(),
+        home: process.env.HOME ?? "~",
+        configFile: configFile(config),
+        force,
+        deleteBranch
+      })
+      yield* Console.log(renderRemoval(result, removalVerbs(yield* DryRun)))
+    }).pipe(reportPlan)
+).pipe(Command.withDescription("remove one linked worktree by slug"), Command.provide(services))
+
 const initCommand = Command.make(
   "init",
   {
@@ -244,7 +317,18 @@ const initCommand = Command.make(
 
 export const zwt = Command.make("zwt").pipe(
   Command.withDescription("git worktree helper"),
-  Command.withSubcommands([configCommand, newCommand, identityCommand, doctorCommand, syncCommand, statusCommand, initCommand]),
+  Command.withSubcommands([
+    configCommand,
+    newCommand,
+    identityCommand,
+    doctorCommand,
+    syncCommand,
+    statusCommand,
+    initCommand,
+    listCommand,
+    pruneCommand,
+    rmCommand
+  ]),
   Command.withGlobalFlags([DryRun])
 )
 

@@ -141,6 +141,72 @@ describe("fake Git layer", () => {
   })
 })
 
+describe("worktree porcelain", () => {
+  it("parses branch, detached, locked and prunable worktrees", () => {
+    const porcelain = [
+      "worktree /repo",
+      "HEAD abc",
+      "branch refs/heads/main",
+      "",
+      "worktree /wt",
+      "HEAD def",
+      "branch refs/heads/feature/login",
+      "locked held for review",
+      "",
+      "worktree /det",
+      "HEAD eee",
+      "detached",
+      "",
+      "worktree /gone",
+      "HEAD fff",
+      "branch refs/heads/old",
+      "prunable gitdir file points to non-existent location",
+      "",
+      "worktree /bare",
+      "HEAD ggg",
+      "bare"
+    ].join("\n")
+    expect(parseWorktrees(porcelain)).toEqual([
+      { path: "/repo", head: { _tag: "Branch", name: "main" }, locked: false, prunable: false },
+      { path: "/wt", head: { _tag: "Branch", name: "feature/login" }, locked: true, prunable: false },
+      { path: "/det", head: { _tag: "Detached" }, locked: false, prunable: false },
+      { path: "/gone", head: { _tag: "Branch", name: "old" }, locked: false, prunable: true },
+      { path: "/bare", head: { _tag: "Bare" }, locked: false, prunable: false }
+    ])
+    expect(parseWorktreeList(porcelain, "feature/login")).toEqual(Option.some("/wt"))
+    expect(parseWorktreeList(porcelain, "missing")).toEqual(Option.none())
+    expect(parseWorktrees("")).toEqual([])
+  })
+
+  it.effect("treats a bare checkout as clean", () => {
+    const args = ["--no-optional-locks", "status", "--porcelain=v1", "-z"]
+    const fake = Git.fake({
+      [args.join(" ")]: new GitCommandFailed({
+        args,
+        exitCode: 128,
+        stderr: "fatal: this operation must be run in a work tree"
+      })
+    })
+    return Effect.gen(function*() {
+      expect(yield* (yield* Git).statusPorcelain("/bare")).toBe("")
+    }).pipe(Effect.provide(fake.layer))
+  })
+
+  it.effect("treats merge-base exit 1 as not an ancestor", () => {
+    const merged = ["merge-base", "--is-ancestor", "feature/done", "develop"]
+    const open = ["merge-base", "--is-ancestor", "feature/wip", "develop"]
+    const fake = Git.fake({
+      [merged.join(" ")]: "",
+      [open.join(" ")]: new GitCommandFailed({ args: open, exitCode: 1, stderr: "" })
+    })
+    return Effect.gen(function*() {
+      const git = yield* Git
+      expect(yield* git.isAncestor("feature/done", "develop", "/repo")).toBe(true)
+      expect(yield* git.isAncestor("feature/wip", "develop", "/repo")).toBe(false)
+    }).pipe(Effect.provide(fake.layer))
+  })
+})
+
 describe("dry-run git config", () => {
   it.effect("remembers a worktree email so the later read matches the planned write", () =>
     Effect.gen(function*() {
@@ -153,6 +219,19 @@ describe("dry-run git config", () => {
       const planned = yield* (yield* DryRunLog).planned
       expect(planned.map((write) => write.description).join("\n")).toContain("config --worktree user.email ada@example.com")
       expect(planned.some((write) => write.description.includes("--global"))).toBe(false)
+    }).pipe(Effect.provide(Layer.mergeAll(Git.dryRun, DryRunLog.layer).pipe(Layer.provideMerge(DryRunLog.layer)))))
+
+  it.effect("records worktree removal and a merged-base branch delete", () =>
+    Effect.gen(function*() {
+      const git = yield* Git
+      yield* git.removeWorktree("/repo", "/wt", true)
+      yield* git.deleteLocalBranch("feature/done", "/repo", "merged-base")
+      yield* git.deleteLocalBranch("feature/landed", "/repo", "merged-head")
+      expect((yield* (yield* DryRunLog).planned).map((write) => write.description)).toEqual([
+        "git -C /repo worktree remove --force /wt",
+        "git -C /repo branch -D feature/done",
+        "git -C /repo branch -d feature/landed"
+      ])
     }).pipe(Effect.provide(Layer.mergeAll(Git.dryRun, DryRunLog.layer).pipe(Layer.provideMerge(DryRunLog.layer)))))
 
   it.effect("does not record an origin read", () =>

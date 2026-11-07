@@ -208,6 +208,97 @@ export class InvalidSlug extends Data.TaggedError("InvalidSlug")<{
   }
 }
 
+export class PruneNeedsMerged extends Data.TaggedError("PruneNeedsMerged")<{}> {
+  override get message() {
+    return "zwt prune removes nothing unless --merged is set"
+  }
+  get fix() {
+    return "zwt prune --merged"
+  }
+}
+
+export class WorktreeDirty extends Data.TaggedError("WorktreeDirty")<{
+  readonly path: string
+  readonly slug: string
+}> {
+  override get message() {
+    return `refusing to remove dirty worktree ${this.path}`
+  }
+  get fix() {
+    return `commit or stash the changes in ${this.path}, or run: zwt rm ${this.slug} --force`
+  }
+}
+
+export class WorktreeUnmerged extends Data.TaggedError("WorktreeUnmerged")<{
+  readonly path: string
+  readonly branch: string
+  readonly base: string
+  readonly slug: string
+}> {
+  override get message() {
+    return `refusing to remove ${this.path}: branch "${this.branch}" is not merged into ${this.base}`
+  }
+  get fix() {
+    return `merge "${this.branch}" into ${this.base}, or run: zwt rm ${this.slug} --force`
+  }
+}
+
+export class WorktreeLocked extends Data.TaggedError("WorktreeLocked")<{
+  readonly path: string
+}> {
+  override get message() {
+    return `refusing to remove locked worktree ${this.path}`
+  }
+  get fix() {
+    return `git worktree unlock ${this.path}`
+  }
+}
+
+export class WorktreeCurrent extends Data.TaggedError("WorktreeCurrent")<{
+  readonly path: string
+}> {
+  override get message() {
+    return `refusing to remove ${this.path} while it is the current directory`
+  }
+  get fix() {
+    return "cd to the main checkout and run the command again"
+  }
+}
+
+export class WorktreeMissing extends Data.TaggedError("WorktreeMissing")<{
+  readonly path: string
+}> {
+  override get message() {
+    return `refusing to remove ${this.path}: its directory is gone, so zwt cannot prove it is clean`
+  }
+  get fix() {
+    return "git worktree prune"
+  }
+}
+
+export class MainWorktree extends Data.TaggedError("MainWorktree")<{
+  readonly path: string
+}> {
+  override get message() {
+    return `refusing to remove the main worktree ${this.path}`
+  }
+  get fix() {
+    return "zwt rm removes a linked worktree, not the main checkout"
+  }
+}
+
+export class AmbiguousWorktree extends Data.TaggedError("AmbiguousWorktree")<{
+  readonly slug: string
+  readonly paths: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `slug "${this.slug}" matches more than one worktree: ${this.paths.join(", ")}`
+  }
+  get fix() {
+    return "zwt list"
+  }
+}
+
 export type ZwtError =
   | BranchNotFound
   | IdentityMismatch
@@ -225,6 +316,14 @@ export type ZwtError =
   | InvalidSlug
   | OverwriteRefused
   | SyncFailed
+  | PruneNeedsMerged
+  | WorktreeDirty
+  | WorktreeUnmerged
+  | WorktreeLocked
+  | WorktreeCurrent
+  | WorktreeMissing
+  | MainWorktree
+  | AmbiguousWorktree
 
 const zwtTags = new Set<string>([
   "BranchNotFound",
@@ -242,7 +341,15 @@ const zwtTags = new Set<string>([
   "DoctorFailed",
   "InvalidSlug",
   "OverwriteRefused",
-  "SyncFailed"
+  "SyncFailed",
+  "PruneNeedsMerged",
+  "WorktreeDirty",
+  "WorktreeUnmerged",
+  "WorktreeLocked",
+  "WorktreeCurrent",
+  "WorktreeMissing",
+  "MainWorktree",
+  "AmbiguousWorktree"
 ])
 
 export const isZwtError = <E>(u: E): u is Extract<E, ZwtError> =>

@@ -76,6 +76,12 @@ export interface GitShape {
     readonly branch: string
     readonly base: string
   }) => Effect.Effect<void, GitCommandFailed>
+  readonly removeWorktree: (cwd: string, path: string, force: boolean) => Effect.Effect<void, GitCommandFailed>
+  /**
+   * `merged-head` is `git branch -d`. `merged-base` is `git branch -D`, only for a
+   * branch the caller already proved is an ancestor of the configured base but not of HEAD.
+   */
+  readonly deleteLocalBranch: (branch: string, cwd: string, mode: BranchDeleteMode) => Effect.Effect<void, GitCommandFailed>
 }
 
 const repoScopedEnv = (): NodeJS.ProcessEnv =>
@@ -141,6 +147,22 @@ export const parseAheadBehind = (
   const ahead = Number(aheadRaw)
   if (!Number.isInteger(behind) || !Number.isInteger(ahead) || behind < 0 || ahead < 0) return Option.none()
   return Option.some({ ahead, behind })
+}
+
+/** `merged-head` deletes with `-d`. `merged-base` deletes with `-D` after an ancestor check outside this method. */
+export type BranchDeleteMode = "merged-head" | "merged-base"
+
+const branchDeleteFlag = (mode: BranchDeleteMode): "-d" | "-D" => {
+  switch (mode) {
+    case "merged-head":
+      return "-d"
+    case "merged-base":
+      return "-D"
+    default: {
+      const unreachable: never = mode
+      return unreachable
+    }
+  }
 }
 
 /** Reads always run `read`; anything that changes the repo goes through `write`. */
@@ -218,7 +240,10 @@ const fromRunner = (read: GitShape["run"], write: GitShape["run"]): GitShape => 
       Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(Option.none()))
     ),
   commonDir: (cwd) => read(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd),
-  addWorktree: ({ cwd, path, branch, base }) => write(["worktree", "add", "-b", branch, path, base], cwd).pipe(Effect.asVoid)
+  addWorktree: ({ cwd, path, branch, base }) => write(["worktree", "add", "-b", branch, path, base], cwd).pipe(Effect.asVoid),
+  removeWorktree: (cwd, path, force) =>
+    write(["worktree", "remove", ...(force ? ["--force"] : []), path], cwd).pipe(Effect.asVoid),
+  deleteLocalBranch: (branch, cwd, mode) => write(["branch", branchDeleteFlag(mode), branch], cwd).pipe(Effect.asVoid)
 })
 
 export class Git extends Context.Service<Git, GitShape>()("zwt/Git") {
