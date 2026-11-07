@@ -222,9 +222,9 @@ export type ZwtError =
   | RemoteIdentityMismatch
   | NotARepository
   | DoctorFailed
-  | SyncFailed
   | InvalidSlug
   | OverwriteRefused
+  | SyncFailed
 
 const zwtTags = new Set<string>([
   "BranchNotFound",
@@ -240,9 +240,9 @@ const zwtTags = new Set<string>([
   "RemoteIdentityMismatch",
   "NotARepository",
   "DoctorFailed",
-  "SyncFailed",
   "InvalidSlug",
-  "OverwriteRefused"
+  "OverwriteRefused",
+  "SyncFailed"
 ])
 
 export const isZwtError = <E>(u: E): u is Extract<E, ZwtError> =>

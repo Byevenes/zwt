@@ -155,7 +155,7 @@ export const remoteIdentityClash = (options: {
   return { pattern: match.pattern, required: match.identity, actual: "(unresolved)" }
 }
 
-/** `[[project]]` base, else the deepest profile, else `main`. Same rules as `zwt new` without `--base`. */
+/** `[[project]]` > deepest `[[profile]]` > `main`. Same base `zwt new` uses when `--base` is absent. */
 export const resolveBase = (options: {
   readonly config: ZwtConfig
   readonly repoRoot: string

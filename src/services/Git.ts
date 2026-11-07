@@ -33,6 +33,7 @@ export interface GitShape {
   readonly originUrl: (cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
   readonly fetch: (remote: string, branch: string, cwd: string) => Effect.Effect<void, GitCommandFailed>
   readonly commitOf: (ref: string, cwd: string) => Effect.Effect<Option.Option<string>, GitCommandFailed>
+  /** `git merge-base --is-ancestor`. Exit 1 is false; any other failure propagates. */
   readonly isAncestor: (ancestor: string, descendant: string, cwd: string) => Effect.Effect<boolean, GitCommandFailed>
   /**
    * Move `refs/heads/<branch>` to `source` only when that is a fast-forward.

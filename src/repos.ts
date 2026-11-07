@@ -10,7 +10,8 @@ export type ConfiguredRepo =
   | { readonly _tag: "Absent"; readonly path: string }
 
 /**
- * Project paths are always rows. A path inside a repo is that repo's toplevel.
+ * Same roots as `zwt doctor --all`.
+ * A `[[project]]` path is always a row: its git toplevel, or `Absent` when it is not a repository.
  * A profile match root is a row only when `rev-parse --show-toplevel` is that path itself.
  */
 export const configuredRepos = (config: ZwtConfig, home: string) =>
