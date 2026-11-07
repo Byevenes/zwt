@@ -1,6 +1,0 @@
-version = 1
-token = "abc"
-
-[identity.personal]
-name = "Jane Doe"
-email = "jane@example.com"

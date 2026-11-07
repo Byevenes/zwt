@@ -16,8 +16,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "test", "vitest.config.ts"],
-  "contentMappers": [
-    { "package": "motherload", "extensions": [".toml"] }
-  ]
+  "include": ["src", "test", "vitest.config.ts"]
 }

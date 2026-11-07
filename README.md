@@ -60,7 +60,7 @@ An invalid config is rejected with the offending line and a suggested fix. See `
 
 ## Development
 
-- Checks: `bun run typecheck` (Node 24 or newer; Motherload's content mapper is a Node program), `bun run lint`, `bun run test`.
+- Checks: `bun run typecheck`, `bun run lint`, `bun run test`.
 - Design decisions: [`docs/adr/`](docs/adr/).
 - Learning notes on Effect (in Spanish): [`docs/learn/`](docs/learn/).
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md).
