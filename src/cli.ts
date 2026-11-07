@@ -68,9 +68,14 @@ const configCommand = Command.make("config").pipe(
 const newCommand = Command.make(
   "new",
   {
-    slug: Argument.String("slug").pipe(Argument.withDescription("task slug, appended to the branch prefix")),
+    slug: Argument.String("slug").pipe(
+      Argument.withDescription("task slug; a leading ticket key fills {ticket} when branch_template is set")
+    ),
     base: Flag.String("base").pipe(Flag.withDescription("base branch (overrides zwt.toml)"), Flag.optional),
-    prefix: Flag.String("prefix").pipe(Flag.withDescription("branch prefix (overrides zwt.toml)"), Flag.optional),
+    prefix: Flag.String("prefix").pipe(
+      Flag.withDescription("branch prefix; skips branch_template and overrides zwt.toml"),
+      Flag.optional
+    ),
     email: Flag.String("email").pipe(Flag.withDescription("git email for this worktree (overrides zwt.toml)"), Flag.optional),
     identity: Flag.String("identity").pipe(Flag.withDescription("identity key from zwt.toml"), Flag.optional),
     strict: Flag.Boolean("strict").pipe(

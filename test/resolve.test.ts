@@ -188,6 +188,120 @@ describe("resolveNew precedence: flag > project > profile > defaults", () => {
     }))
 })
 
+const ticketToml = (profile: string) =>
+  [
+    "version = 1",
+    "[identity.personal]",
+    'name = "Ada"',
+    'email = "ada@example.com"',
+    "[[profile]]",
+    'match = "~/work/**"',
+    'identity = "personal"',
+    'branch_prefix = "feature/"',
+    profile
+  ].join("\n")
+
+describe("branch template", () => {
+  const repoRoot = "/home/jane/work/acme/web"
+  const pattern = 'ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+"\nbranch_template = "feature/{ticket}-{slug}"'
+
+  it.effect("keeps prefix plus slug when no template is set", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("t.toml", ticketToml('ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+"'))
+      const plan = resolveNew({ config, repoRoot, slug: "ABC-123", home, flags: none })
+      expect(plan.branch).toBe("feature/ABC-123")
+      expect(plan.branchError).toBeUndefined()
+      expect(plan.worktreePath).toBe("/home/jane/work/acme/worktrees/web/ABC-123")
+    }))
+
+  it.effect("builds the branch from the ticket key and drops an empty slug", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("t.toml", ticketToml(pattern))
+      const keyOnly = resolveNew({ config, repoRoot, slug: "ABC-123", home, flags: none })
+      expect(keyOnly.branch).toBe("feature/ABC-123")
+      expect(keyOnly.branchError).toBeUndefined()
+      expect(keyOnly.worktreePath).toBe("/home/jane/work/acme/worktrees/web/ABC-123")
+      const described = resolveNew({ config, repoRoot, slug: "ABC-123-fix-login", home, flags: none })
+      expect(described.branch).toBe("feature/ABC-123-fix-login")
+      expect(described.worktreePath).toBe("/home/jane/work/acme/worktrees/web/ABC-123-fix-login")
+      const underscored = resolveNew({ config, repoRoot, slug: "ABC-123_fix-login", home, flags: none })
+      expect(underscored.branch).toBe("feature/ABC-123-fix-login")
+    }))
+
+  it.effect("stops when the slug does not start with the ticket key", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("t.toml", ticketToml(pattern))
+      const plan = resolveNew({ config, repoRoot, slug: "fix-ABC-123", home, flags: none })
+      expect(plan.branch).toBe("")
+      expect(plan.branchError).toEqual({ _tag: "TicketMissing", pattern: "[A-Z][A-Z0-9]+-[0-9]+" })
+      const lower = resolveNew({ config, repoRoot, slug: "abc-123", home, flags: none })
+      expect(lower.branchError?._tag).toBe("TicketMissing")
+    }))
+
+  it.effect("uses {prefix} and {slug} without requiring a ticket", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("t.toml", ticketToml('branch_template = "{prefix}{slug}"'))
+      const plan = resolveNew({ config, repoRoot, slug: "login", home, flags: none })
+      expect(plan.branch).toBe("feature/login")
+      expect(plan.branchError).toBeUndefined()
+    }))
+
+  it.effect("puts the ticket in its own path segment", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig(
+        "t.toml",
+        ticketToml('ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+"\nbranch_template = "{ticket}/{slug}"')
+      )
+      const described = resolveNew({ config, repoRoot, slug: "ABC-123-fix-login", home, flags: none })
+      expect(described.branch).toBe("ABC-123/fix-login")
+      const keyOnly = resolveNew({ config, repoRoot, slug: "ABC-123", home, flags: none })
+      expect(keyOnly.branch).toBe("ABC-123")
+    }))
+
+  it.effect("--prefix skips the template and keeps the whole slug", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("t.toml", ticketToml(pattern))
+      const plan = resolveNew({
+        config,
+        repoRoot,
+        slug: "login",
+        home,
+        flags: { ...none, prefix: Option.some("hotfix/") }
+      })
+      expect(plan.branch).toBe("hotfix/login")
+      expect(plan.branchError).toBeUndefined()
+    }))
+
+  it.effect("a deeper profile without a template wins over a parent template", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig(
+        "t.toml",
+        `${ticketToml(pattern)}\n[[profile]]\nmatch = "~/work/acme/**"\nidentity = "personal"\nbranch_prefix = "m/"\n`
+      )
+      const plan = resolveNew({ config, repoRoot, slug: "ABC-123", home, flags: none })
+      expect(plan.branch).toBe("m/ABC-123")
+      expect(plan.branchError).toBeUndefined()
+    }))
+
+  it.effect("a project base does not replace the profile template", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig(
+        "t.toml",
+        `${ticketToml(pattern)}\n[[project]]\npath = "~/work/acme/web"\nbase_branch = "release"\n`
+      )
+      const plan = resolveNew({ config, repoRoot, slug: "ABC-123-fix-login", home, flags: none })
+      expect(plan.base).toBe("release")
+      expect(plan.branch).toBe("feature/ABC-123-fix-login")
+    }))
+
+  it.effect("reports an empty rendered name", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig("t.toml", ticketToml('branch_template = "{prefix}"').replace('branch_prefix = "feature/"\n', ""))
+      const plan = resolveNew({ config, repoRoot, slug: "login", home, flags: none })
+      expect(plan.branchError).toEqual({ _tag: "Empty" })
+    }))
+})
+
 describe("[[remote]] identity", () => {
   const config = {
     version: 1 as const,

@@ -24,6 +24,8 @@ match = "~/work/acme/**"
 identity = "work"
 base_branch = "develop"
 branch_prefix = "feature/"
+# ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+" # regex at the start of the slug; not a [[remote]] substring
+# branch_template = "feature/{ticket}-{slug}" # {ticket} {slug} {prefix}; omit to keep prefix + slug
 expect_remote = "gitlab.com:acme/"
 guards = ["pre-commit", "pre-push"]
 

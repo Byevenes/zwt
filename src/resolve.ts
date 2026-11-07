@@ -33,8 +33,13 @@ export type IdentityResolution =
   | { readonly _tag: "Unresolved" }
   | { readonly _tag: "Unknown"; readonly name: string }
 
+export type BranchNameError =
+  | { readonly _tag: "TicketMissing"; readonly pattern: string }
+  | { readonly _tag: "Empty" }
+
 export interface NewPlan {
   readonly branch: string
+  readonly branchError?: BranchNameError
   readonly base: string
   readonly worktreePath: string
   readonly scratchDir: string
@@ -191,6 +196,91 @@ export const resolveWorktreePath = (options: {
   return `${root}/${repoName}/${options.slug}`
 }
 
+/**
+ * Regular expression anchored at the start of the slug.
+ * `*` is a quantifier here, not a glob. `[[remote]].pattern` stays a substring.
+ * Undefined when `pattern` is not a valid RegExp.
+ */
+export const compileTicketPattern = (pattern: string): RegExp | undefined => {
+  try {
+    return new RegExp(`^(?:${pattern})`)
+  } catch {
+    return undefined
+  }
+}
+
+const splitTicket = (slug: string, pattern: string): { readonly ticket: string; readonly rest: string } | undefined => {
+  const compiled = compileTicketPattern(pattern)
+  if (compiled === undefined) return undefined
+  const match = compiled.exec(slug)
+  if (match === null || match[0].length === 0) return undefined
+  return { ticket: match[0], rest: slug.slice(match[0].length).replace(/^[-_]/, "") }
+}
+
+const isJoiner = (text: string) => text === "-" || text === "_" || text === "/"
+
+type TemplatePiece =
+  | { readonly _tag: "lit"; readonly text: string }
+  | { readonly _tag: "ph"; readonly name: "ticket" | "slug" | "prefix" }
+
+/** Drops an empty placeholder and one `-`, `_`, or `/` written next to it. */
+const fillTemplate = (
+  template: string,
+  values: { readonly ticket: string; readonly slug: string; readonly prefix: string }
+): string => {
+  const pieces: Array<TemplatePiece> = []
+  const pattern = /\{(ticket|slug|prefix)\}/g
+  let last = 0
+  for (const match of template.matchAll(pattern)) {
+    const index = match.index
+    if (index === undefined) continue
+    if (index > last) pieces.push({ _tag: "lit", text: template.slice(last, index) })
+    const name = match[1]
+    if (name === "ticket" || name === "slug" || name === "prefix") pieces.push({ _tag: "ph", name })
+    last = index + match[0].length
+  }
+  if (last < template.length) pieces.push({ _tag: "lit", text: template.slice(last) })
+
+  const drop = new Set<number>()
+  for (let i = 0; i < pieces.length; i++) {
+    const piece = pieces[i]
+    if (piece === undefined || piece._tag !== "ph" || values[piece.name] !== "") continue
+    drop.add(i)
+    const prev = pieces[i - 1]
+    const next = pieces[i + 1]
+    if (prev?._tag === "lit" && isJoiner(prev.text)) drop.add(i - 1)
+    else if (next?._tag === "lit" && isJoiner(next.text)) drop.add(i + 1)
+  }
+
+  let branch = ""
+  for (let i = 0; i < pieces.length; i++) {
+    if (drop.has(i)) continue
+    const piece = pieces[i]
+    if (piece === undefined) continue
+    branch += piece._tag === "lit" ? piece.text : values[piece.name]
+  }
+  return branch
+}
+
+const nameBranch = (options: {
+  readonly slug: string
+  readonly prefix: string
+  readonly template: string | undefined
+  readonly pattern: string | undefined
+}): { readonly _tag: "Ready"; readonly branch: string } | BranchNameError => {
+  const { pattern, prefix, slug, template } = options
+  if (template === undefined) return { _tag: "Ready", branch: `${prefix}${slug}` }
+  if (!template.includes("{ticket}")) {
+    const branch = fillTemplate(template, { ticket: "", slug, prefix })
+    return branch.length === 0 ? { _tag: "Empty" } : { _tag: "Ready", branch }
+  }
+  if (pattern === undefined || pattern.length === 0) return { _tag: "TicketMissing", pattern: "" }
+  const split = splitTicket(slug, pattern)
+  if (split === undefined) return { _tag: "TicketMissing", pattern }
+  const branch = fillTemplate(template, { ticket: split.ticket, slug: split.rest, prefix })
+  return branch.length === 0 ? { _tag: "Empty" } : { _tag: "Ready", branch }
+}
+
 /** Pure resolution for `zwt new`: `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults. */
 export const resolveNew = (options: {
   readonly config: ZwtConfig
@@ -201,14 +291,22 @@ export const resolveNew = (options: {
 }): NewPlan => {
   const { config, flags, home, slug } = options
   const repoRoot = trimSlash(options.repoRoot)
+  const { profile } = matchesFor(config, repoRoot, home)
   const flaggedBase = Option.getOrUndefined(flags.base)
-  const flaggedPrefix = Option.getOrUndefined(flags.prefix)
+  const flagPrefix = Option.getOrUndefined(flags.prefix)
   const base = flaggedBase !== undefined ? flaggedBase : resolveBase({ config, repoRoot, home })
-  const prefix = flaggedPrefix !== undefined ? flaggedPrefix : resolvePrefix({ config, repoRoot, home })
+  const prefix = flagPrefix !== undefined ? flagPrefix : resolvePrefix({ config, repoRoot, home })
   const identity = resolveIdentity({ config, repoRoot, home, flags })
+  const named = nameBranch({
+    slug,
+    prefix,
+    template: flagPrefix === undefined ? profile?.branch_template : undefined,
+    pattern: profile?.ticket_pattern
+  })
 
   return {
-    branch: `${prefix}${slug}`,
+    branch: named._tag === "Ready" ? named.branch : "",
+    ...(named._tag === "Ready" ? {} : { branchError: named }),
     base,
     worktreePath: resolveWorktreePath({ config, repoRoot, home, slug }),
     scratchDir: config.scratch_dir ?? defaults.scratch_dir,

@@ -1,8 +1,24 @@
 import { Console, Effect, FileSystem, Option } from "effect"
 import { applyWorktreeIdentity } from "./identity.ts"
-import { BranchNotFound, IdentityUnresolved, InvalidSlug, RemoteIdentityMismatch, UnknownIdentity } from "../errors.ts"
+import {
+  BranchNotFound,
+  EmptyBranchName,
+  IdentityUnresolved,
+  InvalidSlug,
+  RemoteIdentityMismatch,
+  TicketKeyNotFound,
+  UnknownIdentity
+} from "../errors.ts"
 import { appendExcludeLine } from "../exclude.ts"
-import { isValidSlug, type Identity, type NewFlags, remoteIdentityClash, resolveIdentityKey, resolveNew } from "../resolve.ts"
+import {
+  isValidSlug,
+  remoteIdentityClash,
+  resolveIdentityKey,
+  resolveNew,
+  type BranchNameError,
+  type Identity,
+  type NewFlags
+} from "../resolve.ts"
 import { Config, type ZwtConfig } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
 import { Prompt } from "../services/Prompt.ts"
@@ -83,6 +99,19 @@ const enforceRemoteIdentity = (options: {
     yield* Console.error(`warning: ${error.message}\n  fix: ${error.fix}`)
   })
 
+const rejectBranchName = (slug: string, error: BranchNameError): TicketKeyNotFound | EmptyBranchName => {
+  switch (error._tag) {
+    case "TicketMissing":
+      return new TicketKeyNotFound({ slug, pattern: error.pattern })
+    case "Empty":
+      return new EmptyBranchName({ slug })
+    default: {
+      const exhaustive: never = error
+      return exhaustive
+    }
+  }
+}
+
 /** `zwt new <slug>`: resolve the plan from zwt.toml, then create (or report) the worktree. */
 export const newWorktree = (options: {
   readonly slug: string
@@ -101,6 +130,7 @@ export const newWorktree = (options: {
     const repoRoot = yield* git.repoRoot(cwd)
     const plan = resolveNew({ config: loaded, repoRoot, slug, home, flags })
     if (plan.identity._tag === "Unknown") return yield* new UnknownIdentity({ name: plan.identity.name, file: configFile })
+    if (plan.branchError !== undefined) return yield* rejectBranchName(slug, plan.branchError)
 
     const existing = yield* git.worktreeForBranch(plan.branch, repoRoot)
     if (Option.isSome(existing)) {
