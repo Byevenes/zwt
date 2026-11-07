@@ -379,6 +379,18 @@ export class AmbiguousWorktree extends Data.TaggedError("AmbiguousWorktree")<{
   }
 }
 
+export class ActionLogUnreadable extends Data.TaggedError("ActionLogUnreadable")<{
+  readonly file: string
+  readonly detail: string
+}> {
+  override get message() {
+    return `could not read action log ${this.file}: ${this.detail}`
+  }
+  get fix() {
+    return `check that ${this.file} is a readable file`
+  }
+}
+
 export type ZwtError =
   | BranchNotFound
   | IdentityMismatch
@@ -410,6 +422,7 @@ export type ZwtError =
   | CommandUnset
   | CommandNotFound
   | CommandFailed
+  | ActionLogUnreadable
 
 const zwtTags = new Set<string>([
   "BranchNotFound",
@@ -441,7 +454,8 @@ const zwtTags = new Set<string>([
   "WorktreeNotFound",
   "CommandUnset",
   "CommandNotFound",
-  "CommandFailed"
+  "CommandFailed",
+  "ActionLogUnreadable"
 ])
 
 export const isZwtError = <E>(u: E): u is Extract<E, ZwtError> =>

@@ -4,7 +4,7 @@ A small CLI for git worktrees. One command creates a worktree with the right bra
 
 Built with TypeScript + [Effect](https://effect.website), compiled with Bun to a single binary.
 
-> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt open <slug>`, `zwt agent <slug>`, `zwt identity list|set|check`, `zwt doctor`, `zwt sync`, `zwt status`, `zwt init`, `zwt list`, `zwt prune --merged`, and `zwt rm <slug>`. The backlog lives in the issues.
+> **Status: experimental / in development.** Implemented today: `zwt config check`, `zwt new <slug>`, `zwt open <slug>`, `zwt agent <slug>`, `zwt identity list|set|check`, `zwt doctor`, `zwt sync`, `zwt status`, `zwt init`, `zwt list`, `zwt prune --merged`, `zwt rm <slug>`, and `zwt log`. The backlog lives in the issues.
 
 ## Install
 
@@ -76,6 +76,7 @@ bun run build                       # dist/zwt, one executable
 ./dist/zwt rm login                  # remove the worktree for that slug
 ./dist/zwt rm login --force          # also remove a dirty or unmerged worktree
 ./dist/zwt rm login --delete-branch
+./dist/zwt log                       # recent writes from this machine
 ```
 
 `zwt new` resolves branch prefix, base and identity as `--flag` > `[[project]]` > `[[profile]]` (deepest match) > defaults (`main`, no prefix, `worktrees`). `--email` and `--identity` are the identity flags. The worktree goes to `<repo parent>/<worktrees_dir>/<repo>/<slug>`. Re-running with the same slug prints the existing worktree.
@@ -105,6 +106,8 @@ Before creating a worktree, `zwt new` reads `origin`. When that URL contains a `
 `zwt rm <slug>` removes one linked worktree: the path `zwt new` would create, a folder named `<slug>`, or the branch `<prefix><slug>`. An exact `zwt new` path wins when several match. It refuses a dirty or unmerged worktree unless `--force` is passed. `--force` still refuses a locked worktree, the main checkout, and the directory you are in, and it does not delete an unmerged branch. `--delete-branch` follows the same rule as prune. A slug that matches nothing prints `absent` and exits zero.
 
 `zwt open <slug>` runs the deepest matching profile's `open_command` in the worktree and appends the worktree path as the last argument. `zwt agent <slug>` runs `agent_command` with that worktree as its working directory and does not append the path. The slug uses the same branch as `zwt new` without flags. The resolved command is printed before it runs. `--dry-run` prints it and does not run it. The value is an executable plus arguments separated by spaces, not a shell command. A missing executable is an error that names it. With no `open_command`, `zwt open` stops and `zwt new --open` stops before it creates a worktree. With no `agent_command`, `zwt agent` stops. The deepest profile does not inherit these keys from a broader one. `zwt new --open` runs the editor after the worktree is created, and also when that slug already exists.
+
+`zwt log` prints recent write actions from this machine: timestamp, result, and the git or file command. Entries are appended to `$XDG_STATE_HOME/zwt/actions.log` (`~/.local/state/zwt/actions.log` when `XDG_STATE_HOME` is unset). Nothing is sent over the network. Older lines are dropped so the file stays near 256 KiB; the newest line is always kept. `--dry-run` does not append.
 
 An invalid config is rejected with the offending line and a suggested fix. See `examples/zwt.toml` for a valid one.
 
@@ -188,6 +191,7 @@ zwt init [--yes] [--dry-run]
 zwt list
 zwt prune --merged [--delete-branch] [--dry-run]
 zwt rm <slug> [--force] [--delete-branch] [--dry-run]
+zwt log
 ```
 
 ## License

@@ -5,14 +5,16 @@ import { runDoctor } from "./commands/doctor.ts"
 import { checkIdentity, interactiveSession, listIdentities, setIdentity } from "./commands/identity.ts"
 import { initConfig } from "./commands/init.ts"
 import { finishOpen, launchInWorktree, prepareOpen } from "./commands/launch.ts"
+import { showLog } from "./commands/log.ts"
 import { newWorktree } from "./commands/new.ts"
 import { type LaunchKind } from "./resolve.ts"
 import { runStatus } from "./commands/status.ts"
 import { renderSyncTable, syncFailure, syncRepos } from "./commands/sync.ts"
 import { listWorktrees, pruneMerged, removeWorktreeBySlug, renderList, renderPrune, renderRemoval, type RemovalVerbs } from "./commands/worktrees.ts"
+import { ActionLog } from "./services/ActionLog.ts"
 import { Config, defaultConfigPath } from "./services/Config.ts"
 import { DryRunLog, renderPlan } from "./services/DryRun.ts"
-import { dryRunFileSystem } from "./services/FileSystem.ts"
+import { dryRunFileSystem, loggingFileSystem } from "./services/FileSystem.ts"
 import { Git } from "./services/Git.ts"
 import { Launch } from "./services/Launch.ts"
 import { Prompt } from "./services/Prompt.ts"
@@ -21,11 +23,15 @@ export const DryRun = GlobalFlag.Setting("dry-run")({
   flag: Flag.Boolean("dry-run").pipe(Flag.withDescription("print planned writes instead of running them"), Flag.withDefault(false))
 })
 
-const liveServices = Layer.mergeAll(Git.live, Config.live, Prompt.live, Launch.live, DryRunLog.layer)
+const liveServices = Layer.mergeAll(Git.logging, Config.live, Prompt.live, Launch.live, DryRunLog.layer).pipe(
+  Layer.provideMerge(loggingFileSystem),
+  Layer.provideMerge(ActionLog.live)
+)
 
 const dryRunServices = Layer.mergeAll(Git.dryRun, Config.live, Prompt.live, Launch.dryRun).pipe(
   Layer.provideMerge(dryRunFileSystem),
-  Layer.provideMerge(DryRunLog.layer)
+  Layer.provideMerge(DryRunLog.layer),
+  Layer.provideMerge(ActionLog.live)
 )
 
 export const services = Layer.unwrap(
@@ -383,6 +389,11 @@ const initCommand = Command.make(
   Command.provide(services)
 )
 
+const logCommand = Command.make("log", {}, () => showLog.pipe(reportPlan)).pipe(
+  Command.withDescription("show recent local write actions"),
+  Command.provide(services)
+)
+
 export const zwt = Command.make("zwt").pipe(
   Command.withDescription("git worktree helper"),
   Command.withSubcommands([
@@ -397,7 +408,8 @@ export const zwt = Command.make("zwt").pipe(
     initCommand,
     listCommand,
     pruneCommand,
-    rmCommand
+    rmCommand,
+    logCommand
   ]),
   Command.withGlobalFlags([DryRun])
 )

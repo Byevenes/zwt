@@ -10,7 +10,13 @@ const home = join(root, "home")
 const repo = join(home, "work", "acme", "web")
 const main = new URL("../src/main.ts", import.meta.url).pathname
 const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")))
-const runEnv = { ...env, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), GIT_CONFIG_NOSYSTEM: "1" }
+const runEnv = {
+  ...env,
+  HOME: home,
+  XDG_CONFIG_HOME: join(home, ".config"),
+  XDG_STATE_HOME: join(home, ".local", "state"),
+  GIT_CONFIG_NOSYSTEM: "1"
+}
 const git = (cwd: string, ...args: Array<string>) => execFileSync("git", args, { cwd, env: runEnv, stdio: ["ignore", "pipe", "ignore"] }).toString().trim()
 const zwt = (...args: Array<string>) => spawnSync(process.execPath, [main, ...args], { cwd: repo, env: runEnv, encoding: "utf8" })
 const globalDigest = () => {
