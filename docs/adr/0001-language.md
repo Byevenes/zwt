@@ -14,6 +14,7 @@ zwt is a small personal CLI that mostly shells out to git. The candidates were G
 - It ships as one executable built with `bun build --compile`.
 - Git hooks (#5, #13) stay as POSIX `sh` scripts. zwt installs and checks them but never rewrites them.
 - The config is `zwt.toml`, validated at runtime with Effect Schema (D2).
+- Motherload (TypeScript 7.1 content mappers, beta) types the bundled example config and the test fixtures. That check is type-level only: deleting it does not change what `parseConfig` accepts.
 
 ## Why
 
