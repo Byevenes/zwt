@@ -116,6 +116,7 @@ An invalid config is rejected with the offending line and a suggested fix. See `
 - Checks: `bun run typecheck`, `bun run lint`, `bun run test`.
 - Design decisions: [`docs/adr/`](docs/adr/).
 - Learning notes on Effect (in Spanish): [`docs/learn/`](docs/learn/).
+- MVP retro: [`docs/retro.md`](docs/retro.md).
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Vision
