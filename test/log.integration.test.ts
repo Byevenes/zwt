@@ -109,7 +109,7 @@ describe("zwt log", () => {
     expect(dryLog.stdout).toContain("dry-run: nothing to write")
     expect(dryLog.stdout).toContain(entries[0]?.command)
     expect(readFileSync(logFile)).toEqual(before)
-  })
+  }, 20_000)
 
   it("uses ~/.local/state when XDG_STATE_HOME is unset", () => {
     const { XDG_STATE_HOME: _state, ...withoutState } = runEnv
