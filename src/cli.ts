@@ -394,6 +394,23 @@ const logCommand = Command.make("log", {}, () => showLog.pipe(reportPlan)).pipe(
   Command.provide(services)
 )
 
+export interface UserCommand {
+  readonly command: string
+  readonly description: string
+}
+
+export const walkUserCommands = (root: Command.Command.Any): ReadonlyArray<UserCommand> => {
+  const walk = (current: Command.Command.Any, prefix: string): ReadonlyArray<UserCommand> =>
+    current.subcommands.flatMap((group) =>
+      group.commands.flatMap((child) => {
+        if (child.unlisted) return []
+        const command = prefix.length === 0 ? child.name : `${prefix} ${child.name}`
+        return [{ command, description: child.description ?? "" }, ...walk(child, command)]
+      })
+    )
+  return walk(root, "")
+}
+
 export const zwt = Command.make("zwt").pipe(
   Command.withDescription("git worktree helper"),
   Command.withSubcommands([
