@@ -1,6 +1,6 @@
 # 04. oxlint con tipos (tsrs) en CI
 
-Nota de #31. Qué mostró correr el linter con tipos sobre `src/` y `test/`, y qué quedó en el workflow.
+Nota de #31, actualizada en #55. Qué mostró correr el linter con tipos sobre `src/` y `test/`, y qué quedó en el workflow.
 
 ## El comando
 
