@@ -113,7 +113,7 @@ An invalid config is rejected with the offending line and a suggested fix. See `
 
 ## Development
 
-- Checks: `bun run typecheck`, `bun run lint`, `bun run test`.
+- Checks: `bun run typecheck`, `bun run lint` (`oxlint --type-aware` with tsrs and `.oxlintrc.json`), `bun run test`.
 - Command map: [`docs/feature-map.md`](docs/feature-map.md). A new command needs a row there. `test/feature-map.test.ts` checks the tree.
 - Design decisions: [`docs/adr/`](docs/adr/).
 - Learning notes on Effect (in Spanish): [`docs/learn/`](docs/learn/).

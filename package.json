@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "effect-tsgo --tsrs-lint oxlint --type-aware --deny-warnings src test",
+    "lint": "oxlint --type-aware --deny-warnings src test",
     "test": "bun --bun vitest run",
     "build": "bun build src/main.ts --compile --outfile dist/zwt"
   },
@@ -19,10 +19,10 @@
   },
   "devDependencies": {
     "@antithesishq/bombadil": "0.8.0",
-    "@effect/tsgo": "0.67.4",
     "@effect/vitest": "4.1.2",
     "@types/bun": "^1.4.4",
-    "oxlint": "1.91.0",
+    "oxlint": "1.94.0",
+    "tsrs": "7.1.0-beta.tsrs4",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
   }

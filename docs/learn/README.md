@@ -7,7 +7,7 @@ Una nota por slice del MVP (#20). Cada una explica la idea de Effect o de git qu
 | [01](01-services-and-layers.md) | slice 1 (#30) | servicios, Layers, `Effect.gen`, errores tipados, `--dry-run` |
 | [02](02-schema-and-config.md) | slice 2 (#33) | Schema y `zwt.toml` portable |
 | [03](03-prompt-and-worktree-config.md) | slice 3 (#35, #36) | Prompt y config por worktree |
-| [04](04-tsrs-lint.md) | #40, #41 | linter con tipos en CI |
+| [04](04-tsrs-lint.md) | #40, #41 | oxlint con tipos (tsrs) en CI |
 | [05](05-exit-codes-and-option.md) | #37, #38, #42, #48 | códigos de salida de git como `Option` |
 | [06](06-refusals-as-errors.md) | #43, #46, #47 | guardas antes de borrar |
 | [07](07-action-log-and-tap.md) | #44 | registro de acciones, `tap`, `provideMerge` |
