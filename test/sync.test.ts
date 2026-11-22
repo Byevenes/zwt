@@ -16,6 +16,8 @@ const remote = "b".repeat(40)
 const failed = (args: ReadonlyArray<string>, exitCode = 1, stderr = "") =>
   new GitCommandFailed({ args, exitCode, stderr })
 
+const key = (cwd: string, args: string) => `${cwd}\0${args}`
+
 const work = { name: "Jane Doe", email: "jane.doe@example.com" }
 
 const configOf = (config: ZwtConfig) =>
@@ -258,7 +260,6 @@ describe("zwt sync", () => {
   it.effect("continues after a fetch failure and still fast-forwards the next repo", () => {
     const first = "/repos/a"
     const second = "/repos/b"
-    const key = (cwd: string, args: string) => `${cwd}\0${args}`
     const fetchArgs = ["fetch", "--quiet", "origin", "main"]
     const fake = Git.fake({
       [key(first, "rev-parse --show-toplevel")]: first,
@@ -292,7 +293,6 @@ describe("zwt sync", () => {
     const solo = "/home/jane/solo"
     const missing = "/home/jane/missing"
     const notRepo = failed(["rev-parse", "--show-toplevel"], 128, "fatal: not a git repository")
-    const key = (cwd: string, args: string) => `${cwd}\0${args}`
     const fake = Git.fake({
       [key(repo, "rev-parse --show-toplevel")]: repo,
       [key("/home/jane/work/acme", "rev-parse --show-toplevel")]: notRepo,

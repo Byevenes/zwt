@@ -5,6 +5,31 @@ import { Config, defaultConfigPath, looksLikeToken, parseConfig, upsertProjectTo
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8")
 
+const branchTemplateProfile = (template: string) =>
+  [
+    "version = 1",
+    "[identity.personal]",
+    'name = "Ada"',
+    'email = "ada@example.com"',
+    "[[profile]]",
+    'match = "~/work/**"',
+    'identity = "personal"',
+    `branch_template = ${JSON.stringify(template)}`
+  ].join("\n")
+
+const ticketPatternProfile = (pattern: string) =>
+  [
+    "version = 1",
+    "[identity.personal]",
+    'name = "Ada"',
+    'email = "ada@example.com"',
+    "[[profile]]",
+    'match = "~/work/**"',
+    'identity = "personal"',
+    `ticket_pattern = ${JSON.stringify(pattern)}`,
+    'branch_template = "{ticket}"'
+  ].join("\n")
+
 describe("zwt.toml schema", () => {
   it.effect("accepts the example config", () =>
     Effect.gen(function*() {
@@ -158,50 +183,27 @@ describe("zwt.toml schema", () => {
 
   it.effect("rejects branch templates with unknown or unbalanced placeholders", () =>
     Effect.gen(function*() {
-      const profile = (template: string) =>
-        [
-          "version = 1",
-          "[identity.personal]",
-          'name = "Ada"',
-          'email = "ada@example.com"',
-          "[[profile]]",
-          'match = "~/work/**"',
-          'identity = "personal"',
-          `branch_template = ${JSON.stringify(template)}`
-        ].join("\n")
-      const unknown = yield* Effect.flip(parseConfig("t.toml", profile("feature/{nope}")))
+      const unknown = yield* Effect.flip(parseConfig("t.toml", branchTemplateProfile("feature/{nope}")))
       expect(unknown.issues[0]).toMatchObject({ path: "profile[0].branch_template", line: 8 })
       expect(unknown.issues[0]?.message).toContain("{nope}")
-      const open = yield* Effect.flip(parseConfig("t.toml", profile("feature/{slug")))
+      const open = yield* Effect.flip(parseConfig("t.toml", branchTemplateProfile("feature/{slug")))
       expect(open.issues[0]?.message).toMatch(/unmatched brace/)
-      const close = yield* Effect.flip(parseConfig("t.toml", profile("feature/slug}")))
+      const close = yield* Effect.flip(parseConfig("t.toml", branchTemplateProfile("feature/slug}")))
       expect(close.issues[0]?.message).toMatch(/unmatched brace/)
-      const doubled = yield* Effect.flip(parseConfig("t.toml", profile("{{ticket}}")))
+      const doubled = yield* Effect.flip(parseConfig("t.toml", branchTemplateProfile("{{ticket}}")))
       expect(doubled.issues[0]?.message).toContain("unknown placeholder {{ticket}")
-      const plain = yield* Effect.flip(parseConfig("t.toml", profile("feature/static")))
+      const plain = yield* Effect.flip(parseConfig("t.toml", branchTemplateProfile("feature/static")))
       expect(plain.issues[0]?.message).toMatch(/must include/)
     }))
 
   it.effect("rejects ticket patterns that are not a non-empty regular expression", () =>
     Effect.gen(function*() {
-      const profile = (pattern: string) =>
-        [
-          "version = 1",
-          "[identity.personal]",
-          'name = "Ada"',
-          'email = "ada@example.com"',
-          "[[profile]]",
-          'match = "~/work/**"',
-          'identity = "personal"',
-          `ticket_pattern = ${JSON.stringify(pattern)}`,
-          'branch_template = "{ticket}"'
-        ].join("\n")
-      const star = yield* Effect.flip(parseConfig("t.toml", profile("*")))
+      const star = yield* Effect.flip(parseConfig("t.toml", ticketPatternProfile("*")))
       expect(star.issues[0]?.path).toBe("profile[0].ticket_pattern")
       expect(star.issues[0]?.message).toMatch(/regular expression/)
-      const emptyMatch = yield* Effect.flip(parseConfig("t.toml", profile("A*")))
+      const emptyMatch = yield* Effect.flip(parseConfig("t.toml", ticketPatternProfile("A*")))
       expect(emptyMatch.issues[0]?.message).toMatch(/empty ticket key/)
-      const blank = yield* Effect.flip(parseConfig("t.toml", profile("")))
+      const blank = yield* Effect.flip(parseConfig("t.toml", ticketPatternProfile("")))
       expect(blank.issues[0]?.message).toMatch(/non-empty/)
     }))
 

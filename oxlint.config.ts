@@ -13,6 +13,5 @@ export default defineConfig({
     "typescript/no-empty-object-type": "off", // temporary during migration
     "typescript/no-unnecessary-type-assertion": "off", // temporary during migration
     "typescript/no-unsafe-type-assertion": "off", // temporary during migration
-    "unicorn/consistent-function-scoping": "off", // temporary during migration
   },
 });
