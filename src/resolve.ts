@@ -376,14 +376,15 @@ export const resolveNew = (options: {
     pattern: profile?.ticket_pattern
   })
 
-  return {
+  const plan: NewPlan = {
     branch: named._tag === "Ready" ? named.branch : "",
-    ...(named._tag === "Ready" ? {} : { branchError: named }),
     base,
     worktreePath: resolveWorktreePath({ config, repoRoot, home, slug }),
     scratchDir: config.scratch_dir ?? defaults.scratch_dir,
     identity
   }
+  if (named._tag === "Ready") {return plan}
+  return { ...plan, branchError: named }
 }
 
 export const isValidSlug = (slug: string): boolean => /^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(slug) && !slug.includes("..")

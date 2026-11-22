@@ -188,15 +188,14 @@ export const parseConfig = (file: string, source: string): Effect.Effect<ZwtConf
   Effect.gen(function*() {
     const raw = yield* Effect.try({
       try: () => parseToml(source),
-      catch: (error) =>
-        new ConfigInvalid({
-          file,
-          issues: [{
-            path: "(toml)",
-            message: error instanceof TomlError ? error.message.split("\n")[0] ?? "invalid TOML" : String(error),
-            ...(error instanceof TomlError ? { line: error.line } : {})
-          }]
-        })
+      catch: (error) => {
+        const message = error instanceof TomlError ? error.message.split("\n")[0] ?? "invalid TOML" : String(error)
+        const issue: ConfigIssue = { path: "(toml)", message }
+        if (error instanceof TomlError) {
+          return new ConfigInvalid({ file, issues: [{ ...issue, line: error.line }] })
+        }
+        return new ConfigInvalid({ file, issues: [issue] })
+      }
     })
     const exit = decode(raw, { errors: "all", onExcessProperty: "error" })
     if (Exit.isFailure(exit)) {
