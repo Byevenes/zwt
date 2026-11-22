@@ -128,7 +128,7 @@ describe("zwt identity", () => {
   })
 
   it.effect("set --dry-run records the toml write and leaves the file untouched", () => {
-    let text = source
+    const text = source
     const backing = FileSystem.layerNoop({
       readFileString: () => Effect.succeed(text),
       writeFileString: () => Effect.die("real write during dry-run")

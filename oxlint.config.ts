@@ -6,7 +6,6 @@ export default defineConfig({
   rules: {
     ...cloudflare.rules,
     "import/no-namespace": "off", // temporary during migration
-    "prefer-const": "off", // temporary during migration
     "@nkzw/no-instanceof": "off", // temporary during migration
     "quality/no-conditional-empty-object-spread": "off", // temporary during migration
     "quality/no-known-value-widening": "off", // temporary during migration
