@@ -3,9 +3,18 @@ import { defineConfig } from "oxlint";
 
 export default defineConfig({
   ...cloudflare,
+  overrides: [
+    ...cloudflare.overrides,
+    {
+      files: ["src/services/Config.ts"],
+      // effect/SchemaIssue is a public namespace (issue constructors plus formatters).
+      rules: {
+        "import/no-namespace": "off",
+      },
+    },
+  ],
   rules: {
     ...cloudflare.rules,
-    "import/no-namespace": "off", // temporary during migration
     "@nkzw/no-instanceof": "off", // temporary during migration
     "quality/no-conditional-empty-object-spread": "off", // temporary during migration
     "quality/no-known-value-widening": "off", // temporary during migration
