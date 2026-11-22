@@ -21,7 +21,7 @@ export const actionResult = (error: unknown): string => {
   const message = typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
     ? error.message
     : ""
-  const flat = message.replace(/\s+/g, " ").trim()
+  const flat = message.replaceAll(/\s+/g, " ").trim()
   if (flat.length === 0) {return "error"}
   const clipped = flat.length > maxResultLength ? `${flat.slice(0, maxResultLength)}...` : flat
   return `error: ${clipped}`

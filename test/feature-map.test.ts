@@ -98,7 +98,7 @@ describe("feature map", () => {
       encoding: "utf8",
       env,
       input: "",
-      timeout: 10000
+      timeout: 10_000
     })
     expect(`${wizard.stdout}${wizard.stderr}`).toContain("Command wizard")
   })

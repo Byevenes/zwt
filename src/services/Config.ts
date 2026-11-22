@@ -114,7 +114,7 @@ const decode = Schema.decodeUnknownExit(ZwtConfigSchema)
 const formatPath = (path: ReadonlyArray<PropertyKey>) =>
   path.map((segment) => typeof segment === "number" ? `[${segment}]` : `.${String(segment)}`).join("").replace(/^\./, "") || "(root)"
 
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+const escapeRegExp = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
 
 export const lineOf = (source: string, path: ReadonlyArray<PropertyKey>): number | undefined => {
   const lines = source.split("\n").map((line) => line.trim())
@@ -246,7 +246,7 @@ export interface ProjectMapping {
 /** Insert or replace a `[[project]]` identity mapping without rewriting the rest of the file. */
 export const upsertProjectToml = (source: string, entry: ProjectMapping): string => {
   const target = trimSlash(expandHome(entry.path, entry.home))
-  const normalized = source.replace(/\r\n/g, "\n")
+  const normalized = source.replaceAll("\r\n", "\n")
   const lines = normalized.endsWith("\n") ? normalized.slice(0, -1).split("\n") : normalized.split("\n")
   const headers = lines.flatMap((line, index) => isTableHeader(line) ? [index] : [])
 

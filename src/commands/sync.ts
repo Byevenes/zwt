@@ -27,7 +27,7 @@ export interface SyncRow {
   readonly fix?: string
 }
 
-const oneLine = (text: string) => text.trim().replace(/\s+/g, " ")
+const oneLine = (text: string) => text.trim().replaceAll(/\s+/g, " ")
 
 const short = (oid: string) => oid.slice(0, 7)
 

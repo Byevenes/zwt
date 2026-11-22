@@ -37,7 +37,7 @@ interface GitConfigView {
   readonly userEmail: string | undefined
 }
 
-const unescapeQuoted = (value: string) => value.replace(/\\(.)/g, (_match, char: string) => char)
+const unescapeQuoted = (value: string) => value.replaceAll(/\\(.)/g, (_match, char: string) => char)
 
 const stripComment = (line: string): string => {
   let quote: "'" | "\"" | undefined
@@ -127,7 +127,7 @@ export const includePaths = (source: string, fromFile: string, home: string): Re
   return [...view.includes, ...view.includeIfs].map((entry) => resolveIncludePath(entry.path, fromFile, home))
 }
 
-const slug = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+const slug = (value: string): string => value.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-").replaceAll(/^-+|-+$/g, "")
 
 /**
  * Stable key for one imported identity.

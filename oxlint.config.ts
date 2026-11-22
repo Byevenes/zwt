@@ -15,9 +15,5 @@ export default defineConfig({
     "typescript/no-unnecessary-type-assertion": "off", // temporary during migration
     "typescript/no-unsafe-type-assertion": "off", // temporary during migration
     "unicorn/consistent-function-scoping": "off", // temporary during migration
-    "unicorn/numeric-separators-style": "off", // temporary during migration
-    "unicorn/prefer-at": "off", // temporary during migration
-    "unicorn/prefer-string-raw": "off", // temporary during migration
-    "unicorn/prefer-string-replace-all": "off", // temporary during migration
   },
 });

@@ -286,7 +286,7 @@ export class Git extends Context.Service<Git, GitShape>()("zwt/Git") {
       }
       const recall = (args: ReadonlyArray<string>, cwd: string) =>
         Ref.get(overlay).pipe(Effect.map((map) => {
-          const key = args[args.length - 1]
+          const key = args.at(-1)
           if (key === undefined) {return undefined}
           if (args[1] === "--show-origin") {
             const value = map.get(`worktree\0${cwd}\0${key}`)
