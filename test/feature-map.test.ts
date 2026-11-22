@@ -24,8 +24,8 @@ const isWrapped = (
   | Param.Variadic<"flag", unknown> => param._tag !== "Single"
 
 const namedFlag = (param: FlagParam): Param.Single<"flag", unknown> => {
-  if (Param.isSingle(param)) return param
-  if (isWrapped(param)) return namedFlag(param.param)
+  if (Param.isSingle(param)) {return param}
+  if (isWrapped(param)) {return namedFlag(param.param)}
   throw new Error("flag has no name")
 }
 
@@ -39,12 +39,12 @@ const flow = (flag: Flag.Flag<unknown>) => {
 
 const parseMap = (markdown: string) =>
   markdown.split("\n").flatMap((line) => {
-    if (!line.startsWith("|")) return []
+    if (!line.startsWith("|")) {return []}
     const cells = line.split("|").slice(1, -1).map((cell) => cell.trim())
     const command = cells[0]?.replaceAll("`", "") ?? ""
     const what = cells[1]?.replaceAll("`", "") ?? ""
     const verified = cells[2] ?? ""
-    if (command.length === 0 || command === "Command" || /^:?-+:?$/.test(command)) return []
+    if (command.length === 0 || command === "Command" || /^:?-+:?$/.test(command)) {return []}
     return [{ command, what, verified }]
   })
 
@@ -53,12 +53,12 @@ const verifiedSpans = (cell: string) => [...cell.matchAll(/`([^`]+)`/g)].map((ma
 describe("feature map", () => {
   it("lists each tree command and the dry-run and wizard flows", () => {
     const expected = new Map<string, string>()
-    for (const row of walkUserCommands(zwt)) expected.set(row.command, row.description)
-    for (const row of [flow(DryRun.flag), flow(GlobalFlag.Wizard.flag)]) expected.set(row.command, row.description)
+    for (const row of walkUserCommands(zwt)) {expected.set(row.command, row.description)}
+    for (const row of [flow(DryRun.flag), flow(GlobalFlag.Wizard.flag)]) {expected.set(row.command, row.description)}
 
     const rows = parseMap(readFileSync(mapPath, "utf8"))
     expect(rows.map((row) => row.command).sort()).toEqual([...expected.keys()].sort())
-    for (const row of rows) expect(row.what).toBe(expected.get(row.command))
+    for (const row of rows) {expect(row.what).toBe(expected.get(row.command))}
 
     const ci = readFileSync(ciPath, "utf8")
     for (const row of rows) {

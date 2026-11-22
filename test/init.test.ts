@@ -165,7 +165,7 @@ describe("zwt init", () => {
     const files = memory({ ...tree, [file]: "version = 1\n" })
     return Effect.gen(function*() {
       const error = yield* Effect.flip(init({ interactive: true }))
-      if (!(error instanceof OverwriteRefused)) return yield* Effect.die(error)
+      if (!(error instanceof OverwriteRefused)) {return yield* Effect.die(error)}
       expect(error.fix).toContain("--yes")
       expect(files.writes).toEqual([])
       expect(files.files.get(file)).toBe("version = 1\n")
@@ -180,7 +180,7 @@ describe("zwt init", () => {
     })
     return Effect.gen(function*() {
       const error = yield* Effect.flip(init({ interactive: false }))
-      if (!(error instanceof OverwriteRefused)) return yield* Effect.die(error)
+      if (!(error instanceof OverwriteRefused)) {return yield* Effect.die(error)}
       expect(error.message).toContain(file)
       expect(files.writes).toEqual([])
     }).pipe(Effect.provide(run(files, prompt)))

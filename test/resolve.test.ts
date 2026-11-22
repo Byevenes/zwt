@@ -23,7 +23,7 @@ describe("paths", () => {
 
   it("accepts plain slugs only", () => {
     expect(isValidSlug("fix-login_2.1")).toBe(true)
-    for (const bad of ["", "a/b", "../x", ".hidden", "a b", "a..b"]) expect(isValidSlug(bad)).toBe(false)
+    for (const bad of ["", "a/b", "../x", ".hidden", "a b", "a..b"]) {expect(isValidSlug(bad)).toBe(false)}
   })
 })
 

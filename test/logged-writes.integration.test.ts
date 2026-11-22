@@ -47,7 +47,7 @@ const linkedWorktrees = (repo: string): ReadonlyArray<{ readonly path: string; r
     const lines = block.split("\n").filter((line) => line.length > 0)
     const path = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length)
     const branch = lines.find((line) => line.startsWith("branch refs/heads/"))?.slice("branch refs/heads/".length)
-    if (path !== undefined && branch !== undefined) found.push({ path, branch })
+    if (path !== undefined && branch !== undefined) {found.push({ path, branch })}
   }
   const main = mainCheckout(repo)
   return found.filter((entry) => entry.path !== main)

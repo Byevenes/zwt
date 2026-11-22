@@ -85,7 +85,7 @@ export const prepareOpen = (options: {
   readonly configFile: string
 }) =>
   Effect.gen(function*() {
-    if (!isValidSlug(options.slug)) return
+    if (!isValidSlug(options.slug)) {return}
     yield* requireLaunchCommand({
       kind: "open",
       cwd: options.cwd,
@@ -111,11 +111,11 @@ export const launchInWorktree = (options: {
 }) =>
   Effect.gen(function*() {
     const { configFile, cwd, home, kind, slug } = options
-    if (!isValidSlug(slug)) return yield* new InvalidSlug({ slug })
+    if (!isValidSlug(slug)) {return yield* new InvalidSlug({ slug })}
     const { loaded, repoRoot } = yield* loadedRepo({ cwd, configFile })
     const plan = resolveNew({ config: loaded, repoRoot, slug, home, flags: emptyFlags })
     const existing = yield* (yield* Git).worktreeForBranch(plan.branch, repoRoot)
-    if (Option.isNone(existing)) return yield* new WorktreeNotFound({ branch: plan.branch, repo: repoRoot, slug })
+    if (Option.isNone(existing)) {return yield* new WorktreeNotFound({ branch: plan.branch, repo: repoRoot, slug })}
     yield* runLaunch({ kind, cwd, home, configFile, worktreePath: existing.value })
     return { path: existing.value, branch: plan.branch }
   })

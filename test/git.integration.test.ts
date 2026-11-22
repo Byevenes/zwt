@@ -20,7 +20,7 @@ beforeAll(() => {
 })
 
 afterAll(() => {
-  for (const key of Object.keys(leakedEnv)) delete process.env[key]
+  for (const key of Object.keys(leakedEnv)) {delete process.env[key]}
   rmSync(root, { recursive: true, force: true })
 })
 

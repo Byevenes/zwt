@@ -110,7 +110,7 @@ describe("launch command", () => {
     return Effect.gen(function*() {
       const error = yield* Effect.flip(launchInWorktree({ ...options, kind: "agent" }))
       expect(error._tag).toBe("CommandUnset")
-      if (error._tag === "CommandUnset") expect(render(error)).toContain("agent_command")
+      if (error._tag === "CommandUnset") {expect(render(error)).toContain("agent_command")}
       expect(launch.calls).toEqual([])
     }).pipe(Effect.provide(Layer.mergeAll(gitLayer().layer, configLayer(toml("")), launch.layer)))
   })
@@ -179,7 +179,7 @@ describe("Launch service", () => {
         (yield* Launch).run({ ...request, argv: [process.execPath, "-e", "process.exit(3)"] })
       )
       expect(error._tag).toBe("CommandFailed")
-      if (error._tag === "CommandFailed") expect(error.exitCode).toBe(3)
+      if (error._tag === "CommandFailed") {expect(error.exitCode).toBe(3)}
       expect(logged(yield* TestConsole.logLines)).toContain("shown-before")
     }).pipe(Effect.provide(Layer.mergeAll(Launch.live, TestConsole.layer))))
 

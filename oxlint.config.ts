@@ -5,7 +5,6 @@ export default defineConfig({
   ...cloudflare,
   rules: {
     ...cloudflare.rules,
-    curly: "off", // temporary during migration
     "import/consistent-type-specifier-style": "off", // temporary during migration
     "import/no-namespace": "off", // temporary during migration
     "prefer-const": "off", // temporary during migration

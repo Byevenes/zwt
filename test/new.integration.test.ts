@@ -131,7 +131,7 @@ describe("zwt new end to end (real git, temp HOME)", () => {
     expect(existsSync(join(home, "work", "acme", "worktrees", "web", "dry"))).toBe(false)
     expect(result.stdout).toContain("config --worktree user.email")
     expect(readFileSync(exclude)).toEqual(before)
-    if (gitignoreBefore !== undefined) expect(readFileSync(gitignore)).toEqual(gitignoreBefore)
+    if (gitignoreBefore !== undefined) {expect(readFileSync(gitignore)).toEqual(gitignoreBefore)}
   })
 
   it("applies --email on the new worktree and leaves the main repo email", () => {

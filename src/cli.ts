@@ -128,7 +128,7 @@ const newCommand = Command.make(
       const cwd = process.cwd()
       const home = process.env.HOME ?? "~"
       const file = configFile(config)
-      if (open) yield* prepareOpen({ slug, cwd, home, configFile: file })
+      if (open) {yield* prepareOpen({ slug, cwd, home, configFile: file })}
       const result = yield* newWorktree({
         slug,
         cwd,
@@ -143,7 +143,7 @@ const newCommand = Command.make(
           ? `exists ${result.path} (branch ${result.branch})`
           : `${(yield* DryRun) ? "would create" : "created"} ${result.path}\n  branch ${result.branch} from ${result.base}, identity ${result.email}`
       )
-      if (!open) return
+      if (!open) {return}
       yield* finishOpen({ cwd, home, configFile: file, worktreePath: result.path })
       yield* Console.log(`${launchVerb("open", yield* DryRun)} ${result.path}`)
     }).pipe(reportPlan)
@@ -253,7 +253,7 @@ const syncCommand = Command.make("sync", { config: configFlag }, ({ config }) =>
       return found
     }).pipe(reportPlan)
     const failure = syncFailure(rows)
-    if (failure !== undefined) return yield* failure
+    if (failure !== undefined) {return yield* failure}
   })).pipe(
   Command.withDescription("fetch and fast-forward the base branch of every configured repo"),
   Command.provide(services)
@@ -403,7 +403,7 @@ export const walkUserCommands = (root: Command.Command.Any): ReadonlyArray<UserC
   const walk = (current: Command.Command.Any, prefix: string): ReadonlyArray<UserCommand> =>
     current.subcommands.flatMap((group) =>
       group.commands.flatMap((child) => {
-        if (child.unlisted) return []
+        if (child.unlisted) {return []}
         const command = prefix.length === 0 ? child.name : `${prefix} ${child.name}`
         return [{ command, description: child.description ?? "" }, ...walk(child, command)]
       })

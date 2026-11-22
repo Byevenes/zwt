@@ -43,21 +43,21 @@ export const daysSince = (activityMs: number, nowMs: number): number => {
  * A rename or copy is `XY <old>\0<new>\0`; the path that exists now is `<new>`.
  */
 export const parseStatusPaths = (porcelain: string): ReadonlyArray<string> => {
-  if (porcelain.length === 0) return []
+  if (porcelain.length === 0) {return []}
   const paths: Array<string> = []
   const parts = porcelain.split("\0")
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i]
-    if (part === undefined || part.length < 3) continue
+    if (part === undefined || part.length < 3) {continue}
     const renamed = part.slice(0, 2).includes("R") || part.slice(0, 2).includes("C")
     if (renamed) {
       const next = parts[i + 1]
-      if (next !== undefined && next.length > 0) paths.push(next)
+      if (next !== undefined && next.length > 0) {paths.push(next)}
       i += 1
       continue
     }
     const path = part.slice(3)
-    if (path.length > 0) paths.push(path)
+    if (path.length > 0) {paths.push(path)}
   }
   return paths
 }
@@ -129,10 +129,10 @@ const activityDays = (options: {
 }): Effect.Effect<number | null> =>
   Effect.gen(function*() {
     const times: Array<number> = []
-    if (Option.isSome(options.committer)) times.push(options.committer.value * 1000)
+    if (Option.isSome(options.committer)) {times.push(options.committer.value * 1000)}
     for (const path of options.paths) {
       const found = yield* options.clock.mtimeMs(path)
-      if (Option.isSome(found)) times.push(found.value)
+      if (Option.isSome(found)) {times.push(found.value)}
     }
     const latest = times.length === 0 ? undefined : Math.max(...times)
     return latest === undefined ? null : daysSince(latest, options.clock.nowMs)
@@ -162,10 +162,10 @@ const rowsFor = (root: string, config: ZwtConfig, home: string, clock: Clock) =>
   Effect.gen(function*() {
     const entries = yield* (yield* Git).listWorktrees(root)
     const main = entries[0]
-    if (main === undefined) return []
+    if (main === undefined) {return []}
     const base = resolveBase({ config, repoRoot: main.path, home })
     const rows: Array<StatusWorktree> = []
-    for (const entry of entries) rows.push(yield* inspect(entry, base, clock))
+    for (const entry of entries) {rows.push(yield* inspect(entry, base, clock))}
     return rows
   })
 
@@ -179,10 +179,10 @@ const allRows = (config: ZwtConfig, home: string, clock: Clock) =>
     const seen = new Set<string>()
     const rows: Array<StatusWorktree> = []
     for (const found of yield* configuredRepos(config, home)) {
-      if (found._tag === "Absent") continue
+      if (found._tag === "Absent") {continue}
       const root = found.repo
       const common = trimSlash(yield* git.commonDir(root))
-      if (seen.has(common)) continue
+      if (seen.has(common)) {continue}
       seen.add(common)
       rows.push(...(yield* rowsFor(root, config, home, clock)))
     }

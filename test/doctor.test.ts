@@ -342,7 +342,7 @@ describe("zwt doctor --all", () => {
     return Effect.gen(function*() {
       const error = yield* Effect.flip(doctor({ all: true, path: Option.some("/home/jane/ignored"), cwd: "/home/jane/ignored" }))
       expect(error._tag).toBe("DoctorFailed")
-      if (error._tag === "DoctorFailed") expect(error.fix).toContain(`edit ${configFile}`)
+      if (error._tag === "DoctorFailed") {expect(error.fix).toContain(`edit ${configFile}`)}
       const text = logged(yield* TestConsole.logLines)
       expect(text.startsWith("repo | current email | expected email | status\n")).toBe(true)
       const rows = text.split("\n").filter((line) => line.startsWith("/")).map((line) => line.split(" | ")[0])

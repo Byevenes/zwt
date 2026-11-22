@@ -43,7 +43,7 @@ const identityCheck = (options: {
 }): Check => {
   const { actual, file, repo, resolution } = options
   if (resolution._tag === "Resolved") {
-    if (actual === resolution.identity.email) return { name: "identity", status: "ok", detail: `matches ${resolution.identity.email}` }
+    if (actual === resolution.identity.email) {return { name: "identity", status: "ok", detail: `matches ${resolution.identity.email}` }}
     const error = new IdentityMismatch({
       repo,
       expected: resolution.identity.email,
@@ -61,7 +61,7 @@ const identityCheck = (options: {
 }
 
 const remoteCheck = (repo: string, expected: string | undefined, origin: Option.Option<string>): Check => {
-  if (expected === undefined) return { name: "expect_remote", status: "ok", detail: "no expect_remote" }
+  if (expected === undefined) {return { name: "expect_remote", status: "ok", detail: "no expect_remote" }}
   if (Option.isNone(origin)) {
     const error = new OriginMissing({ repo, expected })
     return fail("expect_remote", error.message, error.fix)
@@ -81,17 +81,17 @@ const remoteIdentityCheck = (options: {
   readonly email: string | undefined
 }): Check => {
   const rules = options.config.remote
-  if (rules === undefined || rules.length === 0) return { name: "remote_identity", status: "ok", detail: "no [[remote]]" }
-  if (Option.isNone(options.origin)) return { name: "remote_identity", status: "ok", detail: "no origin" }
+  if (rules === undefined || rules.length === 0) {return { name: "remote_identity", status: "ok", detail: "no [[remote]]" }}
+  if (Option.isNone(options.origin)) {return { name: "remote_identity", status: "ok", detail: "no origin" }}
   const matched = matchingRemote(rules, options.origin.value)
-  if (matched === undefined) return { name: "remote_identity", status: "ok", detail: "no matching [[remote]]" }
+  if (matched === undefined) {return { name: "remote_identity", status: "ok", detail: "no matching [[remote]]" }}
   const clash = remoteIdentityClash({
     config: options.config,
     origin: options.origin.value,
     identityKey: options.identityKey,
     email: options.email
   })
-  if (clash === undefined) return { name: "remote_identity", status: "ok", detail: `origin requires ${matched.identity}` }
+  if (clash === undefined) {return { name: "remote_identity", status: "ok", detail: `origin requires ${matched.identity}` }}
   const error = new RemoteIdentityMismatch({
     repo: options.repo,
     origin: options.origin.value,
@@ -196,9 +196,9 @@ const repoJson = (report: RepoReport) => ({
 })
 
 const renderReports = (reports: ReadonlyArray<RepoReport>, output: "text" | "json", all: boolean): string => {
-  if (all) return output === "json" ? JSON.stringify({ repos: reports.map(repoJson) }, null, 2) : renderTable(reports)
+  if (all) {return output === "json" ? JSON.stringify({ repos: reports.map(repoJson) }, null, 2) : renderTable(reports)}
   const report = reports[0]
-  if (report === undefined) return ""
+  if (report === undefined) {return ""}
   return output === "json" ? JSON.stringify(repoJson(report), null, 2) : report.checks.map(renderCheck).join("\n")
 }
 
@@ -206,7 +206,7 @@ const publish = (reports: ReadonlyArray<RepoReport>, output: "text" | "json", al
   Effect.gen(function*() {
     yield* Console.log(renderReports(reports, output, all))
     const fixes = reports.flatMap((report) => report.checks.flatMap((check) => check.fix === undefined ? [] : [check.fix]))
-    if (fixes.length > 0) return yield* new DoctorFailed({ failed: fixes.length, fixes })
+    if (fixes.length > 0) {return yield* new DoctorFailed({ failed: fixes.length, fixes })}
   })
 
 export const runDoctor = (options: {

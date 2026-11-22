@@ -12,7 +12,7 @@ const isEnoent = (error: unknown): boolean =>
 const errorDetail = (error: unknown): string => {
   if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
     const flat = error.message.replace(/\s+/g, " ").trim()
-    if (flat.length > 0) return flat
+    if (flat.length > 0) {return flat}
   }
   return "unknown error"
 }

@@ -70,7 +70,7 @@ export const setIdentity = (options: {
     const { configFile, cwd, home, interactive, name } = options
     const config = yield* Config
     const loaded = yield* config.load(configFile)
-    if (loaded.identity[name] === undefined) return yield* new UnknownIdentity({ name, file: configFile })
+    if (loaded.identity[name] === undefined) {return yield* new UnknownIdentity({ name, file: configFile })}
     const start = Option.isSome(options.path) ? normalizeFolder(options.path.value, cwd, home) : cwd
     const path = trimSlash(yield* (yield* Git).repoRoot(start).pipe(
       Effect.catchIf(
@@ -78,9 +78,9 @@ export const setIdentity = (options: {
         () => Effect.succeed(start)
       )
     ))
-    if (!interactive) return yield* new ConfirmationRequired({ action: "identity set" })
+    if (!interactive) {return yield* new ConfirmationRequired({ action: "identity set" })}
     const save = yield* (yield* Prompt).confirm(`Save identity "${name}" for ${path}?`)
-    if (!save) return { _tag: "Declined", path, identity: name } satisfies SetResult
+    if (!save) {return { _tag: "Declined", path, identity: name } satisfies SetResult}
     yield* config.upsertProject(configFile, { path, identity: name, home })
     return { _tag: "Saved", path, identity: name } satisfies SetResult
   })

@@ -30,10 +30,10 @@ const CommandText = Text.check(
 const Identity = Schema.Struct({ name: Text, email: Email })
 
 const ticketPatternMessage = (value: string): string | undefined => {
-  if (value.length === 0) return "must be a non-empty regular expression"
+  if (value.length === 0) {return "must be a non-empty regular expression"}
   const compiled = compileTicketPattern(value)
-  if (compiled === undefined) return "must be a valid regular expression (* is a quantifier, not a glob)"
-  if (compiled.test("")) return "must not match an empty ticket key"
+  if (compiled === undefined) {return "must be a valid regular expression (* is a quantifier, not a glob)"}
+  if (compiled.test("")) {return "must not match an empty ticket key"}
   return undefined
 }
 
@@ -45,16 +45,16 @@ const TicketPattern = Text.check(Schema.makeFilter((value: string) => ticketPatt
 const placeholders = new Set(["ticket", "slug", "prefix"])
 
 const branchTemplateMessage = (value: string): string | undefined => {
-  if (value.length === 0) return "must not be empty"
+  if (value.length === 0) {return "must not be empty"}
   let found = false
   for (let i = 0; i < value.length; i++) {
     const char = value[i]
-    if (char !== "{" && char !== "}") continue
-    if (char === "}") return "has an unmatched brace; placeholders are {ticket}, {slug}, and {prefix}"
+    if (char !== "{" && char !== "}") {continue}
+    if (char === "}") {return "has an unmatched brace; placeholders are {ticket}, {slug}, and {prefix}"}
     const end = value.indexOf("}", i + 1)
-    if (end < 0) return "has an unmatched brace; placeholders are {ticket}, {slug}, and {prefix}"
+    if (end < 0) {return "has an unmatched brace; placeholders are {ticket}, {slug}, and {prefix}"}
     const name = value.slice(i + 1, end)
-    if (!placeholders.has(name)) return `unknown placeholder {${name}}; allowed: {ticket}, {slug}, {prefix}`
+    if (!placeholders.has(name)) {return `unknown placeholder {${name}}; allowed: {ticket}, {slug}, {prefix}`}
     found = true
     i = end
   }
@@ -130,7 +130,7 @@ export const lineOf = (source: string, path: ReadonlyArray<PropertyKey>): number
     if (typeof next === "number") {
       let seen = -1
       const found = findFrom(from, (line) => line === `[[${candidate}]]` && ++seen === next)
-      if (found === undefined) return undefined
+      if (found === undefined) {return undefined}
       from = found
       table = candidate
       i++
@@ -158,7 +158,7 @@ const formatter = SchemaIssue.makeFormatterStandardSchemaV1()
 const templateIssues = (config: ZwtConfig, source: string): ReadonlyArray<ConfigIssue> =>
   (config.profile ?? []).flatMap((entry, index) => {
     const template = entry.branch_template
-    if (template === undefined || !template.includes("{ticket}") || entry.ticket_pattern !== undefined) return []
+    if (template === undefined || !template.includes("{ticket}") || entry.ticket_pattern !== undefined) {return []}
     return [{
       path: `profile[${index}].branch_template`,
       message: "placeholder {ticket} needs ticket_pattern on this profile",
@@ -209,7 +209,7 @@ export const parseConfig = (file: string, source: string): Effect.Effect<ZwtConf
       return yield* new ConfigInvalid({ file, issues })
     }
     const crossIssues = [...unknownIdentityIssues(exit.value, source), ...templateIssues(exit.value, source)]
-    if (crossIssues.length > 0) return yield* new ConfigInvalid({ file, issues: crossIssues })
+    if (crossIssues.length > 0) {return yield* new ConfigInvalid({ file, issues: crossIssues })}
     return exit.value
   })
 
@@ -219,13 +219,13 @@ const tomlBasicString = (value: string) => JSON.stringify(value)
 
 const readAssignment = (line: string, key: string): string | undefined => {
   const trimmed = line.trim()
-  if (trimmed.startsWith("#")) return undefined
+  if (trimmed.startsWith("#")) {return undefined}
   const match = new RegExp(`^${key}\\s*=\\s*(.*)$`).exec(trimmed)
-  if (match === null || match[1] === undefined) return undefined
+  if (match === null || match[1] === undefined) {return undefined}
   const quoted = /^(?:"(?:\\.|[^"\\])*"|'[^']*')/.exec(match[1].trim())
-  if (quoted === null) return undefined
+  if (quoted === null) {return undefined}
   const token = quoted[0]
-  if (token.startsWith("'")) return token.slice(1, -1)
+  if (token.startsWith("'")) {return token.slice(1, -1)}
   try {
     const parsed = JSON.parse(token) as unknown
     return typeof parsed === "string" ? parsed : undefined
@@ -251,21 +251,21 @@ export const upsertProjectToml = (source: string, entry: ProjectMapping): string
 
   for (let h = 0; h < headers.length; h++) {
     const start = headers[h]
-    if (start === undefined || lines[start]?.trim() !== "[[project]]") continue
+    if (start === undefined || lines[start]?.trim() !== "[[project]]") {continue}
     const end = headers[h + 1] ?? lines.length
     let pathLine = -1
     let identityLine = -1
     for (let i = start + 1; i < end; i++) {
       const line = lines[i]
-      if (line === undefined) continue
-      if (pathLine < 0 && readAssignment(line, "path") !== undefined) pathLine = i
-      if (identityLine < 0 && /^identity\s*=/.test(line.trim())) identityLine = i
+      if (line === undefined) {continue}
+      if (pathLine < 0 && readAssignment(line, "path") !== undefined) {pathLine = i}
+      if (identityLine < 0 && /^identity\s*=/.test(line.trim())) {identityLine = i}
     }
     const pathValue = pathLine < 0 ? undefined : readAssignment(lines[pathLine] ?? "", "path")
-    if (pathValue === undefined || trimSlash(expandHome(pathValue, entry.home)) !== target) continue
+    if (pathValue === undefined || trimSlash(expandHome(pathValue, entry.home)) !== target) {continue}
     const identityText = `identity = ${tomlBasicString(entry.identity)}`
-    if (identityLine >= 0) lines[identityLine] = identityText
-    else lines.splice(pathLine + 1, 0, identityText)
+    if (identityLine >= 0) {lines[identityLine] = identityText}
+    else {lines.splice(pathLine + 1, 0, identityText)}
     return `${lines.join("\n")}\n`
   }
 
