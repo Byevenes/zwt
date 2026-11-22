@@ -113,7 +113,8 @@ An invalid config is rejected with the offending line and a suggested fix. See `
 
 ## Development
 
-- Checks: `bun run typecheck`, `bun run lint` (`oxlint --type-aware` with tsrs and `.oxlintrc.json`), `bun run test`.
+- Checks: `bun run typecheck`, `bun run lint` (`oxlint --type-aware --deny-warnings` on `src` and `test`; config is `oxlint.config.ts` extending `@cloudflare/oxlint-config`), `bun run test`.
+- The Cloudflare preset README still shows `tsrs@0.25.0-ts7.1.0-beta`. This repo keeps `tsrs@7.1.0-beta.tsrs4`, the TypeScript-aligned release that replaced that version. Oxlint stays at `1.94.0`, which matches the preset peer range (`oxlint ^1.94.0`, `tsrs >=0.25.0-ts7.1.0-beta`). `bun run typecheck` stays `tsc --noEmit`.
 - Command map: [`docs/feature-map.md`](docs/feature-map.md). A new command needs a row there. `test/feature-map.test.ts` checks the tree.
 - Design decisions: [`docs/adr/`](docs/adr/).
 - Learning notes on Effect (in Spanish): [`docs/learn/`](docs/learn/).

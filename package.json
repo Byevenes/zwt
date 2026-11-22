@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@antithesishq/bombadil": "0.8.0",
+    "@cloudflare/oxlint-config": "0.1.0",
     "@effect/vitest": "4.1.2",
     "@types/bun": "^1.4.4",
     "oxlint": "1.94.0",
