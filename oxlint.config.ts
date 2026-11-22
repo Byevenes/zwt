@@ -21,7 +21,6 @@ export default defineConfig({
   ],
   rules: {
     ...cloudflare.rules,
-    "quality/no-known-value-widening": "off", // temporary during migration
     "typescript/no-empty-object-type": "off", // temporary during migration
     "typescript/no-unnecessary-type-assertion": "off", // temporary during migration
   },

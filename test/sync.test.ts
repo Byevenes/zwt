@@ -42,7 +42,7 @@ const projectConfig = (extra?: Partial<ZwtConfig>): ZwtConfig => ({
 
 const ancestorArgs = (ancestor: string, descendant: string) => ["merge-base", "--is-ancestor", ancestor, descendant]
 
-const behind = (branch = "feature"): Record<string, string | GitCommandFailed> => ({
+const behind = (branch = "feature") => ({
   "rev-parse --show-toplevel": repo,
   "remote": "origin",
   "fetch --quiet origin main": "",
@@ -50,7 +50,7 @@ const behind = (branch = "feature"): Record<string, string | GitCommandFailed> =
   "rev-parse --verify --quiet refs/heads/main^{commit}": local,
   [ancestorArgs(local, remote).join(" ")]: "",
   "worktree list --porcelain": porcelain(repo, branch)
-})
+} satisfies Record<string, string | GitCommandFailed>)
 
 const writes = (calls: ReadonlyArray<ReadonlyArray<string>>) =>
   calls.some((call) =>
