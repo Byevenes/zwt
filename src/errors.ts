@@ -288,7 +288,7 @@ export class InvalidSlug extends Data.TaggedError("InvalidSlug")<{
   }
 }
 
-export class PruneNeedsMerged extends Data.TaggedError("PruneNeedsMerged")<{}> {
+export class PruneNeedsMerged extends Data.TaggedError("PruneNeedsMerged") {
   override get message() {
     return "zwt prune removes nothing unless --merged is set"
   }

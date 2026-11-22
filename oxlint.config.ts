@@ -21,7 +21,6 @@ export default defineConfig({
   ],
   rules: {
     ...cloudflare.rules,
-    "typescript/no-empty-object-type": "off", // temporary during migration
     "typescript/no-unnecessary-type-assertion": "off", // temporary during migration
   },
 });
