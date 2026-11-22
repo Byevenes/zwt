@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, PlatformError } from "effect"
 import { initConfig } from "../src/commands/init.ts"
-import { OverwriteRefused } from "../src/errors.ts"
 import { gitdirToMatch, identityKeyBase, importIdentities, renderZwtToml, starterDrafts } from "../src/include-if.ts"
 import { parseConfig } from "../src/services/Config.ts"
 import { DryRunLog } from "../src/services/DryRun.ts"
@@ -165,8 +164,8 @@ describe("zwt init", () => {
     const files = memory({ ...tree, [file]: "version = 1\n" })
     return Effect.gen(function*() {
       const error = yield* Effect.flip(init({ interactive: true }))
-      if (!(error instanceof OverwriteRefused)) {return yield* Effect.die(error)}
-      expect(error.fix).toContain("--yes")
+      expect(error._tag).toBe("OverwriteRefused")
+      if (error._tag === "OverwriteRefused") {expect(error.fix).toContain("--yes")}
       expect(files.writes).toEqual([])
       expect(files.files.get(file)).toBe("version = 1\n")
     }).pipe(Effect.provide(run(files, Prompt.scripted({}))))
@@ -180,8 +179,8 @@ describe("zwt init", () => {
     })
     return Effect.gen(function*() {
       const error = yield* Effect.flip(init({ interactive: false }))
-      if (!(error instanceof OverwriteRefused)) {return yield* Effect.die(error)}
-      expect(error.message).toContain(file)
+      expect(error._tag).toBe("OverwriteRefused")
+      if (error._tag === "OverwriteRefused") {expect(error.message).toContain(file)}
       expect(files.writes).toEqual([])
     }).pipe(Effect.provide(run(files, prompt)))
   })

@@ -15,7 +15,6 @@ export default defineConfig({
   ],
   rules: {
     ...cloudflare.rules,
-    "@nkzw/no-instanceof": "off", // temporary during migration
     "quality/no-conditional-empty-object-spread": "off", // temporary during migration
     "quality/no-known-value-widening": "off", // temporary during migration
     "quality/no-unsafe-dictionary-type": "off", // temporary during migration
