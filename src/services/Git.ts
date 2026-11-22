@@ -18,7 +18,7 @@ export interface WorktreeEntry {
   readonly prunable: boolean
 }
 
-/** `global` is not a scope. This slice never writes it. */
+/** `global` is left out on purpose: zwt never writes the global git config. See docs/adr/0002-identity-config-scope-and-gitdir-match.md. */
 export type GitConfigScope = "local" | "worktree"
 
 export interface ConfigOrigin {
@@ -151,7 +151,6 @@ export const parseAheadBehind = (
   return Option.some({ ahead, behind })
 }
 
-/** `merged-head` deletes with `-d`. `merged-base` deletes with `-D` after an ancestor check outside this method. */
 export type BranchDeleteMode = "merged-head" | "merged-base"
 
 const branchDeleteFlag = (mode: BranchDeleteMode): "-d" | "-D" => {
