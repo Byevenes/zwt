@@ -147,11 +147,7 @@ export const identityKeyBase = (email: string, gitdir: string): string => {
   return fromPath.length > 0 ? fromPath : "identity"
 }
 
-/**
- * `gitdir:~/personal/` becomes `~/personal/**` (git already treats a trailing slash as `/**`).
- * A pattern that ends in `/.git` maps to the work tree. Any other path gets `/**`
- * because a zwt profile matches that folder and everything under it.
- */
+/** A gitdir becomes a profile match ending in `/**`. A trailing `/.git` maps to the work tree. See docs/adr/0002-identity-config-scope-and-gitdir-match.md. */
 export const gitdirToMatch = (gitdir: string): string => {
   const folder = gitdir.endsWith("/.git") ? gitdir.slice(0, -"/.git".length) : gitdir
   if (folder.endsWith("/**")) return folder

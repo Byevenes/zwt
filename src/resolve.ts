@@ -27,7 +27,7 @@ export interface Identity {
   readonly email: string
 }
 
-/** Resolved email, an unknown `--identity` name, or nothing to apply. */
+/** A resolved identity, an unknown `--identity` name, or nothing to apply. */
 export type IdentityResolution =
   | { readonly _tag: "Resolved"; readonly identity: Identity }
   | { readonly _tag: "Unresolved" }
@@ -94,7 +94,7 @@ export const resolveExpectRemote = (options: {
   readonly home: string
 }): string | undefined => matchesFor(options.config, trimSlash(options.repoRoot), options.home).profile?.expect_remote
 
-/** Identity key from `--identity`, then `[[project]]`, then the deepest profile. An email-only resolution has none. */
+/** A known `--identity`, else `[[project]]`, else the deepest profile. An unknown `--identity`, or an email-only resolution, has none. */
 export const resolveIdentityKey = (options: {
   readonly config: ZwtConfig
   readonly repoRoot: string
@@ -135,9 +135,10 @@ export const matchingRemote = (
 }
 
 /**
- * A clash is the winning `[[remote]]` requiring a different identity than the folder.
+ * A clash is the winning `[[remote]]` requiring a different identity than the resolved one.
  * Named resolutions compare keys. Email-only resolutions compare that email with the
- * required identity's email. No origin, no rules, or no match is not a clash.
+ * required identity's email; a required identity without an email is not a clash.
+ * An unresolved identity clashes with any matching rule. No origin, no rules, or no match is not a clash.
  */
 export const remoteIdentityClash = (options: {
   readonly config: ZwtConfig
@@ -181,7 +182,7 @@ export const resolvePrefix = (options: {
   return profile?.branch_prefix ?? defaults.branch_prefix
 }
 
-/** `<repo parent>/<worktrees_dir>/<repo>/<slug>`, the same folder `zwt new` creates. */
+/** `<worktrees_dir>/<repo>/<slug>`, the same folder `zwt new` creates. A relative `worktrees_dir` sits under the repo parent; an absolute or `~` path is used as is. */
 export const resolveWorktreePath = (options: {
   readonly config: ZwtConfig
   readonly repoRoot: string
@@ -223,7 +224,7 @@ type TemplatePiece =
   | { readonly _tag: "lit"; readonly text: string }
   | { readonly _tag: "ph"; readonly name: "ticket" | "slug" | "prefix" }
 
-/** Drops an empty placeholder and one `-`, `_`, or `/` written next to it. */
+/** Drops an empty placeholder and one adjacent literal that is exactly `-`, `_`, or `/`. */
 const fillTemplate = (
   template: string,
   values: { readonly ticket: string; readonly slug: string; readonly prefix: string }
@@ -283,7 +284,6 @@ const nameBranch = (options: {
 
 export type LaunchKind = "open" | "agent"
 
-/** `open` appends the worktree path. `agent` keeps the configured arguments and runs in that directory. */
 export const launchCommandKey = (kind: LaunchKind): "open_command" | "agent_command" => {
   switch (kind) {
     case "open":
