@@ -32,8 +32,8 @@ export const encodeEntry = (entry: ActionEntry): string =>
 
 const isEntry = (value: unknown): value is ActionEntry => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {return false}
-  const entry = value as Record<string, unknown>
-  return typeof entry.timestamp === "string" && typeof entry.command === "string" && typeof entry.result === "string"
+  if (!("timestamp" in value) || !("command" in value) || !("result" in value)) {return false}
+  return typeof value.timestamp === "string" && typeof value.command === "string" && typeof value.result === "string"
 }
 
 /** Keeps well-formed lines. A bad line does not hide the rest of the file. */
