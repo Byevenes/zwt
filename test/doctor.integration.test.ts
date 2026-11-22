@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { doctorRepo, doctorRepos } from "./doctor-json.ts"
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "zwt-doctor-")))
 const home = join(root, "home")
@@ -78,12 +79,7 @@ describe("zwt doctor end to end (real git, temp HOME)", () => {
     git(repo, "config", "user.email", "jane@example.com")
     const result = zwt("doctor", "--output", "json", "--config", configPath)
     expect(result.status).toBe(0)
-    const parsed = JSON.parse(result.stdout) as {
-      readonly repo: string
-      readonly currentEmail: string
-      readonly expectedEmail: string
-      readonly checks: ReadonlyArray<{ readonly name: string; readonly status: string }>
-    }
+    const parsed = doctorRepo(result.stdout)
     expect(parsed.repo).toBe(git(repo, "rev-parse", "--show-toplevel"))
     expect(parsed.currentEmail).toBe("jane@example.com")
     expect(parsed.expectedEmail).toBe("jane@example.com")
@@ -121,12 +117,8 @@ describe("zwt doctor end to end (real git, temp HOME)", () => {
     expect(result.stdout).toContain(`zwt identity set external ${toplevel}`)
     const all = zwt("doctor", "--all", "--output", "json", "--config", file)
     expect(all.status).not.toBe(0)
-    const parsed = JSON.parse(all.stdout) as {
-      readonly repos: ReadonlyArray<{
-        readonly checks: ReadonlyArray<{ readonly name: string; readonly status: string; readonly fix?: string }>
-      }>
-    }
-    const check = parsed.repos[0]?.checks.find((item) => item.name === "remote_identity")
+    const repos = doctorRepos(all.stdout)
+    const check = repos[0]?.checks.find((item) => item.name === "remote_identity")
     expect(check?.status).toBe("fail")
     expect(check?.fix).toContain(`zwt identity set external ${toplevel}`)
   })

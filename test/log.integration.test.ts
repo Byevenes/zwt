@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { parseActionLog } from "../src/action-log.ts"
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "zwt-log-")))
 const home = join(root, "home")
@@ -66,9 +67,7 @@ describe("zwt log", () => {
     expect(created.stderr).toBe("")
     expect(created.stdout).toContain("created")
 
-    const entries = readFileSync(logFile, "utf8").trim().split("\n").map((line) =>
-      JSON.parse(line) as { timestamp: string; command: string; result: string }
-    )
+    const entries = parseActionLog(readFileSync(logFile, "utf8"))
     expect(entries.length).toBeGreaterThan(0)
     for (const item of entries) {
       expect(item.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)

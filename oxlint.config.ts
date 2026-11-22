@@ -12,15 +12,5 @@ export default defineConfig({
         "import/no-namespace": "off",
       },
     },
-    {
-      files: ["**/*.{test,spec}.{ts,tsx}", "**/*.integration.test.ts"],
-      rules: {
-        "typescript/no-unsafe-type-assertion": "off", // temporary during migration
-      },
-    },
   ],
-  rules: {
-    ...cloudflare.rules,
-    "typescript/no-unnecessary-type-assertion": "off", // temporary during migration
-  },
 });
