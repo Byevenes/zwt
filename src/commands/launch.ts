@@ -6,13 +6,13 @@ import {
   launchArgv,
   launchCommandKey,
   resolveLaunchCommand,
-  resolveNew,
-  type LaunchKind,
-  type NewFlags
+  resolveNew
 } from "../resolve.ts"
+import type { LaunchKind, NewFlags } from "../resolve.ts"
 import { Config } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
-import { Launch, type LaunchRequest } from "../services/Launch.ts"
+import { Launch } from "../services/Launch.ts"
+import type { LaunchRequest } from "../services/Launch.ts"
 
 const emptyFlags: NewFlags = {
   base: Option.none(),

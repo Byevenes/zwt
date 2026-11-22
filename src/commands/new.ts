@@ -14,12 +14,11 @@ import {
   isValidSlug,
   remoteIdentityClash,
   resolveIdentityKey,
-  resolveNew,
-  type BranchNameError,
-  type Identity,
-  type NewFlags
+  resolveNew
 } from "../resolve.ts"
-import { Config, type ZwtConfig } from "../services/Config.ts"
+import type { BranchNameError, Identity, NewFlags } from "../resolve.ts"
+import { Config } from "../services/Config.ts"
+import type { ZwtConfig } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
 import { Prompt } from "../services/Prompt.ts"
 

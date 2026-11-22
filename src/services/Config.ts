@@ -1,7 +1,8 @@
 import { Context, Effect, Exit, FileSystem, Layer, Schema } from "effect"
 import * as SchemaIssue from "effect/SchemaIssue"
 import { parse as parseToml, TomlError } from "smol-toml"
-import { type ConfigIssue, ConfigInvalid, ConfigNotFound } from "../errors.ts"
+import { ConfigInvalid, ConfigNotFound } from "../errors.ts"
+import type { ConfigIssue } from "../errors.ts"
 import { compileTicketPattern, expandHome } from "../resolve.ts"
 
 const tokenPatterns: ReadonlyArray<RegExp> = [

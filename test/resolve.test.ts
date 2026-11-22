@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
 import { expandHome, formatLaunch, isValidSlug, launchArgv, matchingRemote, profileRoot, remoteIdentityClash, resolveBase, resolveExpectRemote, resolveIdentityKey, resolveLaunchCommand, resolveNew, resolvePrefix, resolveWorktreePath } from "../src/resolve.ts"
-import { parseConfig, type ZwtConfig } from "../src/services/Config.ts"
+import { parseConfig } from "../src/services/Config.ts"
+import type { ZwtConfig } from "../src/services/Config.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
 const none = {

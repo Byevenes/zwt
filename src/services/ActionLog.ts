@@ -1,7 +1,8 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { Context, Effect, Layer } from "effect"
-import { actionLogPath, appendCapped, maxActionLogBytes, parseActionLog, type ActionEntry } from "../action-log.ts"
+import { actionLogPath, appendCapped, maxActionLogBytes, parseActionLog } from "../action-log.ts"
+import type { ActionEntry } from "../action-log.ts"
 import { ActionLogUnreadable } from "../errors.ts"
 
 let tmpSeq = 0

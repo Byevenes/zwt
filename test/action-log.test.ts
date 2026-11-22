@@ -13,9 +13,9 @@ import {
   encodeEntry,
   maxActionLogBytes,
   parseActionLog,
-  renderActionLog,
-  type ActionEntry
+  renderActionLog
 } from "../src/action-log.ts"
+import type { ActionEntry } from "../src/action-log.ts"
 import { showLog } from "../src/commands/log.ts"
 import { ActionLogUnreadable } from "../src/errors.ts"
 import { ActionLog } from "../src/services/ActionLog.ts"

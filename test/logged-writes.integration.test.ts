@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { parseActionLog, type ActionEntry } from "../src/action-log.ts"
+import { parseActionLog } from "../src/action-log.ts"
+import type { ActionEntry } from "../src/action-log.ts"
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "zwt-logged-writes-")))
 const home = join(root, "home")

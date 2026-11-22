@@ -5,9 +5,9 @@ import {
   importIdentities,
   includePaths,
   renderZwtToml,
-  starterDrafts,
-  type IdentityDraft
+  starterDrafts
 } from "../include-if.ts"
+import type { IdentityDraft } from "../include-if.ts"
 import { parseConfig } from "../services/Config.ts"
 import { Prompt } from "../services/Prompt.ts"
 

@@ -1,4 +1,5 @@
-import { spawnSync, type SpawnSyncReturns } from "node:child_process"
+import { spawnSync } from "node:child_process"
+import type { SpawnSyncReturns } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"

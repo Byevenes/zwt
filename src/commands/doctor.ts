@@ -3,8 +3,10 @@ import { Console, Effect, Option } from "effect"
 import { DoctorFailed, IdentityMismatch, IdentityUnresolved, NotARepository, OriginMissing, RemoteIdentityMismatch, RemoteMismatch, UnknownIdentity } from "../errors.ts"
 import { includeIfHint } from "./identity.ts"
 import { configuredRepos } from "../repos.ts"
-import { expandHome, matchingRemote, remoteIdentityClash, resolveExpectRemote, resolveIdentity, resolveIdentityKey, type IdentityResolution } from "../resolve.ts"
-import { Config, type ZwtConfig } from "../services/Config.ts"
+import { expandHome, matchingRemote, remoteIdentityClash, resolveExpectRemote, resolveIdentity, resolveIdentityKey } from "../resolve.ts"
+import type { IdentityResolution } from "../resolve.ts"
+import { Config } from "../services/Config.ts"
+import type { ZwtConfig } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
 
 const trimSlash = (path: string) => path.replace(/\/+$/, "")

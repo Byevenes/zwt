@@ -3,8 +3,10 @@ import { join, resolve as resolvePath } from "node:path"
 import { Console, Effect, Option, Schema } from "effect"
 import { configuredRepos } from "../repos.ts"
 import { expandHome, resolveBase } from "../resolve.ts"
-import { Config, type ZwtConfig } from "../services/Config.ts"
-import { Git, type WorktreeEntry, type WorktreeHead } from "../services/Git.ts"
+import { Config } from "../services/Config.ts"
+import type { ZwtConfig } from "../services/Config.ts"
+import { Git } from "../services/Git.ts"
+import type { WorktreeEntry, WorktreeHead } from "../services/Git.ts"
 
 const dayMs = 86_400_000
 

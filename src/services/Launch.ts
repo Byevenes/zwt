@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
 import { Context, Console, Effect, Layer } from "effect"
-import { CommandFailed, CommandNotFound, type LaunchCommandKey } from "../errors.ts"
+import { CommandFailed, CommandNotFound } from "../errors.ts"
+import type { LaunchCommandKey } from "../errors.ts"
 import { DryRunLog } from "./DryRun.ts"
 
 export interface LaunchRequest {

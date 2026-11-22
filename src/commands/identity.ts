@@ -1,9 +1,11 @@
 import { resolve as resolvePath } from "node:path"
 import { Console, Effect, Option } from "effect"
 import { ConfirmationRequired, IdentityMismatch, IdentityUnresolved, UnknownIdentity } from "../errors.ts"
-import { expandHome, resolveIdentity, type Identity } from "../resolve.ts"
+import { expandHome, resolveIdentity } from "../resolve.ts"
+import type { Identity } from "../resolve.ts"
 import { Config } from "../services/Config.ts"
-import { Git, type GitShape } from "../services/Git.ts"
+import { Git } from "../services/Git.ts"
+import type { GitShape } from "../services/Git.ts"
 import { canPrompt, Prompt } from "../services/Prompt.ts"
 
 const trimSlash = (path: string) => path.replace(/\/+$/, "")

@@ -5,7 +5,8 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterAll, describe, expect, it } from "vitest"
 import { Option } from "effect"
-import { GlobalFlag, type Flag, Param } from "effect/cli"
+import { GlobalFlag, Param } from "effect/cli"
+import type { Flag } from "effect/cli"
 import { DryRun, walkUserCommands, zwt } from "../src/cli.ts"
 
 const repoFile = (path: string) => fileURLToPath(new URL(`../${path}`, import.meta.url))

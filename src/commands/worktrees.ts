@@ -13,7 +13,8 @@ import {
 } from "../errors.ts"
 import { isValidSlug, resolveBase, resolvePrefix, resolveWorktreePath } from "../resolve.ts"
 import { Config } from "../services/Config.ts"
-import { Git, type GitShape, type WorktreeEntry, type WorktreeHead } from "../services/Git.ts"
+import { Git } from "../services/Git.ts"
+import type { GitShape, WorktreeEntry, WorktreeHead } from "../services/Git.ts"
 
 const trimSlash = (path: string) => path.replace(/\/+$/, "")
 
