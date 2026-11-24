@@ -21,10 +21,7 @@ const readOptional = (path: string) =>
     const fs = yield* FileSystem.FileSystem
     return yield* fs.readFileString(path).pipe(
       Effect.map(Option.some),
-      Effect.catchIf(
-        (error) => error.reason._tag === "NotFound",
-        () => Effect.succeed(Option.none<string>())
-      )
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(Option.none<string>()))
     )
   })
 

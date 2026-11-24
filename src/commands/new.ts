@@ -35,10 +35,7 @@ const ensureScratchExcluded = (repoRoot: string, pattern: string) =>
     const file = excludeFile(repoRoot, located)
     const fs = yield* FileSystem.FileSystem
     const current = yield* fs.readFileString(file).pipe(
-      Effect.catchIf(
-        (error) => error.reason._tag === "NotFound",
-        () => Effect.succeed("")
-      )
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(""))
     )
     const next = appendExcludeLine(current, pattern)
     if (next === undefined) {return}
