@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { Context, Effect, Layer, Option, Ref } from "effect"
+import { Context, Effect, Layer, Match, Option, Ref } from "effect"
 import { actionResult } from "../action-log.ts"
 import { BranchNotFound, GitCommandFailed } from "../errors.ts"
 import { ActionLog } from "./ActionLog.ts"
@@ -272,7 +272,11 @@ export class Git extends Context.Service<Git, GitShape>()("zwt/Git") {
       const log = yield* DryRunLog
       const overlay = yield* Ref.make(new Map<string, string>())
       const remember = (args: ReadonlyArray<string>, cwd: string) => {
-        const scope = args[1] === "--worktree" ? "worktree" : args[1] === "--local" ? "local" : undefined
+        const scope = Match.value(args[1]).pipe(
+          Match.when("--worktree", () => "worktree" as const),
+          Match.when("--local", () => "local" as const),
+          Match.orElse(() => undefined)
+        )
         const key = args[2]
         const value = args[3]
         if (args[0] !== "config" || scope === undefined || key === undefined || value === undefined || key.startsWith("--")) {

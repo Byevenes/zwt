@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Option } from "effect"
+import { Console, Effect, Layer, Match, Option } from "effect"
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli"
 import pkg from "../package.json" with { type: "json" }
 import { runDoctor } from "./commands/doctor.ts"
@@ -378,11 +378,11 @@ const initCommand = Command.make(
         interactive: interactiveSession()
       })
       const verb = (yield* DryRun) ? "would write" : "wrote"
-      const line = result._tag === "Declined"
-        ? `not written ${result.file}`
-        : result._tag === "Imported"
-          ? `${verb} ${result.file} (${result.count} ${result.count === 1 ? "identity" : "identities"})`
-          : `${verb} starter ${result.file}`
+      const line = Match.valueTags(result, {
+        Declined: ({ file }) => `not written ${file}`,
+        Imported: ({ file, count }) => `${verb} ${file} (${count} ${count === 1 ? "identity" : "identities"})`,
+        Starter: ({ file }) => `${verb} starter ${file}`
+      })
       yield* Console.log(line)
     }).pipe(reportPlan)
 ).pipe(
