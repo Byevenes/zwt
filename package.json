@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware --deny-warnings src test",
     "test": "bun --bun vitest run",
-    "build": "bun build src/main.ts --compile --outfile dist/zwt"
+    "build": "bun build src/main.ts --compile --outfile dist/zwt",
+    "mutants": "mutant-cafe --in-diff-range origin/main...HEAD --jobs 4 --advisory"
   },
   "dependencies": {
     "@effect/platform-bun": "4.1.2",
@@ -23,6 +24,7 @@
     "@effect/vitest": "4.1.2",
     "@oxlint/plugins": "1.94.0",
     "@types/bun": "^1.4.4",
+    "mutant-cafe": "0.1.7",
     "oxlint": "1.94.0",
     "tsrs": "7.1.0-beta.tsrs4",
     "typescript": "7.0.2",
