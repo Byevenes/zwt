@@ -16,13 +16,27 @@ const exitStatus = extract((state) => state.exitStatus)
 
 const hasStackFrame = (text: string) => /(?:^|\n)[^\n]*\bat [^\n]*\(/.test(text)
 
+const isRequestedHelp = (text: string) =>
+  text.includes("USAGE") && !text.includes("ERROR") && !text.includes("Command wizard")
+
+const isUsageError = (text: string) =>
+  text.includes("USAGE") && text.includes("ERROR") && !text.includes("Command wizard")
+
+const exitedWith = (status: { readonly signal: string | null; readonly code: number } | null | undefined, code: number) => {
+  if (status === null || status === undefined) return true
+  return status.signal === null && status.code === code
+}
+
 export const helpShapedExitsZero = always(() => {
   const text = screenText.current ?? ""
-  const helpShaped = text.includes("USAGE") && !text.includes("Command wizard")
-  if (!helpShaped) return true
-  const status = exitStatus.current
-  if (status === null || status === undefined) return true
-  return status.signal === null && status.code === 0
+  if (!isRequestedHelp(text)) return true
+  return exitedWith(exitStatus.current, 0)
+})
+
+export const usageErrorExitsOne = always(() => {
+  const text = screenText.current ?? ""
+  if (!isUsageError(text)) return true
+  return exitedWith(exitStatus.current, 1)
 })
 
 export const noUnhandledDefect = always(() => {
