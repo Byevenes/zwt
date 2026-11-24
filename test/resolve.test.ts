@@ -290,6 +290,16 @@ describe("branch template", () => {
       expect(keyOnly.branch).toBe("ABC-123")
     }))
 
+  it.effect("keeps a literal that is not a single joiner next to an empty placeholder", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig(
+        "t.toml",
+        ticketToml('ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+"\nbranch_template = "{ticket}+{slug}"')
+      )
+      const keyOnly = resolveNew({ config, repoRoot, slug: "ABC-123", home, flags: none })
+      expect(keyOnly.branch).toBe("ABC-123+")
+    }))
+
   it.effect("--prefix skips the template and keeps the whole slug", () =>
     Effect.gen(function*() {
       const config = yield* parseConfig("t.toml", ticketToml(pattern))
