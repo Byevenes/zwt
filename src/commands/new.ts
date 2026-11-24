@@ -171,7 +171,7 @@ export const newWorktree = (options: {
 
     yield* git.addWorktree({ cwd: repoRoot, path: plan.worktreePath, branch: plan.branch, base })
     yield* applyWorktreeIdentity({ git, repoRoot, worktreePath: plan.worktreePath, identity: selected.identity })
-    // Exists returns above and stays a no-op. Only a worktree this call just created updates exclude.
+    /** Exists returns above and stays a no-op. Only a worktree this call just created updates exclude. */
     yield* ensureScratchExcluded(repoRoot, plan.scratchDir)
     return {
       _tag: "Created",

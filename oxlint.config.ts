@@ -9,6 +9,10 @@ export default defineConfig({
       name: "anti-slop-effect",
       specifier: "./tools/oxlint/anti-slop/effect/index.ts",
     },
+    {
+      name: "zwt",
+      specifier: "./tools/oxlint/no-line-comments/index.ts",
+    },
   ],
   rules: {
     ...cloudflare.rules,
@@ -19,6 +23,7 @@ export default defineConfig({
     "anti-slop-effect/no-manual-tagged-construction": "off",
     "anti-slop-effect/no-service-constructor-imports": "error",
     "anti-slop-effect/prefer-effect-match": "error",
+    "zwt/no-line-comments": "error",
   },
   overrides: [
     ...cloudflare.overrides,

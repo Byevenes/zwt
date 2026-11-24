@@ -236,7 +236,7 @@ const deleteIfAsked = (options: {
     if (!deleteBranch || branch === undefined) {return { branchDeleted: false, branchKept: undefined }}
     if (branch === base) {return { branchDeleted: false, branchKept: "base" as const }}
     if (!merged) {return { branchDeleted: false, branchKept: "unmerged" as const }}
-    // `-d` only looks at HEAD. A branch that is in the base but not in HEAD still has to go.
+    /** `-d` only looks at HEAD. A branch that is in the base but not in HEAD still has to go. */
     const inHead = yield* git.isAncestor(branch, "HEAD", repo)
     yield* git.deleteLocalBranch(branch, repo, inHead ? "merged-head" : "merged-base")
     return { branchDeleted: true, branchKept: undefined }
