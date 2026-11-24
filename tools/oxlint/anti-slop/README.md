@@ -1,0 +1,1 @@
+Copied from [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) at `63dbb09f73438e550a6991dc6d778f979ffbf183` (`skills/install-anti-slop/assets/anti-slop/effect`). These files are maintained in this repo. They are not an npm dependency. The license is [LICENSE](LICENSE).
