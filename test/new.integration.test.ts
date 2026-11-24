@@ -26,7 +26,7 @@ const globalDigest = () => {
 
 beforeAll(() => {
   mkdirSync(join(home, ".config", "zwt"), { recursive: true })
-  // Only the config file is copied in: no other zwt state exists on this "machine" (#8).
+  /** Only the config file is copied in: no other zwt state exists on this "machine" (#8). */
   writeFileSync(
     join(home, ".config", "zwt", "zwt.toml"),
     [
