@@ -27,7 +27,7 @@ export interface SyncRow {
   readonly fix?: string
 }
 
-const oneLine = (text: string) => text.trim().replace(/\s+/g, " ")
+const oneLine = (text: string) => text.trim().replaceAll(/\s+/g, " ")
 
 const short = (oid: string) => oid.slice(0, 7)
 
@@ -62,7 +62,7 @@ export const isBlocking = (status: SyncStatus): boolean => {
 
 export const syncFailure = (rows: ReadonlyArray<SyncRow>): SyncFailed | undefined => {
   const problems = rows.filter((entry) => isBlocking(entry.status))
-  if (problems.length === 0) return undefined
+  if (problems.length === 0) {return undefined}
   return new SyncFailed({
     failed: problems.length,
     fixes: problems.map((entry) => entry.fix ?? `${entry.repo}: ${entry.detail}`)

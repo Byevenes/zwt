@@ -13,9 +13,9 @@ import {
   encodeEntry,
   maxActionLogBytes,
   parseActionLog,
-  renderActionLog,
-  type ActionEntry
+  renderActionLog
 } from "../src/action-log.ts"
+import type { ActionEntry } from "../src/action-log.ts"
 import { showLog } from "../src/commands/log.ts"
 import { ActionLogUnreadable } from "../src/errors.ts"
 import { ActionLog } from "../src/services/ActionLog.ts"
@@ -122,10 +122,10 @@ describe("action log file", () => {
     mkdirSync(blocked)
     const seen: Array<string> = []
     const write = process.stderr.write.bind(process.stderr)
-    process.stderr.write = ((chunk: string | Uint8Array) => {
+    process.stderr.write = (chunk: string | Uint8Array) => {
       seen.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"))
       return true
-    }) as typeof process.stderr.write
+    }
     return Effect.gen(function*() {
       yield* (yield* ActionLog).record({ command: "write /x", result: "ok" })
       expect(seen.join("")).toContain(`warning: could not write action log ${blocked}`)

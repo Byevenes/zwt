@@ -9,9 +9,9 @@ import { Git } from "../src/services/Git.ts"
 const root = mkdtempSync(join(tmpdir(), "zwt-it-"))
 const repo = join(root, "repo")
 const leakedEnv = { GIT_DIR: join(root, "not-a-repo"), GIT_WORK_TREE: root, GIT_INDEX_FILE: join(root, "index") }
+const git = (...args: Array<string>) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" } })
 
 beforeAll(() => {
-  const git = (...args: Array<string>) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" } })
   git("init", "-q", "-b", "main", repo)
   git("-C", repo, "config", "user.email", "jane@example.com")
   git("-C", repo, "config", "user.name", "Jane Doe")
@@ -20,7 +20,7 @@ beforeAll(() => {
 })
 
 afterAll(() => {
-  for (const key of Object.keys(leakedEnv)) delete process.env[key]
+  for (const key of Object.keys(leakedEnv)) {delete process.env[key]}
   rmSync(root, { recursive: true, force: true })
 })
 

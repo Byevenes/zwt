@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
 import { GitCommandFailed } from "../src/errors.ts"
@@ -234,9 +238,16 @@ describe("dry-run git config", () => {
       ])
     }).pipe(Effect.provide(Layer.mergeAll(Git.dryRun, DryRunLog.layer).pipe(Layer.provideMerge(DryRunLog.layer)))))
 
-  it.effect("does not record an origin read", () =>
-    Effect.gen(function*() {
-      yield* (yield* Git).originUrl(process.cwd())
+  it.effect("does not record an origin read", () => {
+    const repo = mkdtempSync(join(tmpdir(), "zwt-origin-read-"))
+    execFileSync("git", ["init", "-q", repo])
+    execFileSync("git", ["-C", repo, "remote", "add", "origin", "https://example.com/acme/app.git"])
+    return Effect.gen(function*() {
+      yield* (yield* Git).originUrl(repo)
       expect(yield* (yield* DryRunLog).planned).toEqual([])
-    }).pipe(Effect.provide(Layer.mergeAll(Git.dryRun, DryRunLog.layer).pipe(Layer.provideMerge(DryRunLog.layer)))))
+    }).pipe(
+      Effect.provide(Layer.mergeAll(Git.dryRun, DryRunLog.layer).pipe(Layer.provideMerge(DryRunLog.layer))),
+      Effect.ensuring(Effect.sync(() => rmSync(repo, { recursive: true, force: true })))
+    )
+  })
 })

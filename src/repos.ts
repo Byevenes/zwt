@@ -20,7 +20,7 @@ export const configuredRepos = (config: ZwtConfig, home: string) =>
     const seen = new Set<string>()
     const repos: Array<ConfiguredRepo> = []
     const remember = (path: string) => {
-      if (seen.has(path)) return false
+      if (seen.has(path)) {return false}
       seen.add(path)
       return true
     }
@@ -32,21 +32,21 @@ export const configuredRepos = (config: ZwtConfig, home: string) =>
         Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(undefined))
       )
       if (located === undefined) {
-        if (remember(path)) repos.push({ _tag: "Absent", path })
+        if (remember(path)) {repos.push({ _tag: "Absent", path })}
         continue
       }
-      if (!remember(located)) continue
+      if (!remember(located)) {continue}
       repos.push({ _tag: "Present", repo: located })
     }
 
     for (const profile of config.profile ?? []) {
       const root = profileRoot(profile.match, home)
-      if (seen.has(root)) continue
+      if (seen.has(root)) {continue}
       const toplevel = yield* git.repoRoot(root).pipe(
         Effect.map((found) => trimSlash(found)),
         Effect.catchIf((error) => error.exitCode === 128, () => Effect.succeed(undefined))
       )
-      if (toplevel !== root || !remember(root)) continue
+      if (toplevel !== root || !remember(root)) {continue}
       repos.push({ _tag: "Present", repo: root })
     }
 

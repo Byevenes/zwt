@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { Context, Effect, Layer, Option, Ref } from "effect"
+import { Context, Effect, Layer, Match, Option, Ref } from "effect"
 import { actionResult } from "../action-log.ts"
 import { BranchNotFound, GitCommandFailed } from "../errors.ts"
 import { ActionLog } from "./ActionLog.ts"
@@ -28,9 +28,9 @@ export interface ConfigOrigin {
 
 export const parseConfigOrigin = (output: string): Option.Option<ConfigOrigin> => {
   const line = output.split("\n").find((entry) => entry.startsWith("file:"))
-  if (line === undefined) return Option.none()
+  if (line === undefined) {return Option.none()}
   const tab = line.indexOf("\t")
-  if (tab < 0) return Option.none()
+  if (tab < 0) {return Option.none()}
   return Option.some({ file: line.slice("file:".length, tab), value: line.slice(tab + 1).trim() })
 }
 
@@ -108,7 +108,7 @@ const headOf = (lines: ReadonlyArray<string>): WorktreeHead => {
     const name = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref
     return { _tag: "Branch", name }
   }
-  if (lines.includes("bare")) return { _tag: "Bare" }
+  if (lines.includes("bare")) {return { _tag: "Bare" }}
   return { _tag: "Detached" }
 }
 
@@ -116,12 +116,12 @@ const worktreeFlag = (lines: ReadonlyArray<string>, name: string): boolean =>
   lines.some((line) => line === name || line.startsWith(`${name} `))
 
 export const parseWorktrees = (porcelain: string): ReadonlyArray<WorktreeEntry> => {
-  if (porcelain.trim() === "") return []
+  if (porcelain.trim() === "") {return []}
   const entries: Array<WorktreeEntry> = []
   for (const block of porcelain.split("\n\n")) {
     const lines = block.split("\n").filter((line) => line.length > 0)
     const path = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length)
-    if (path === undefined || path.length === 0) continue
+    if (path === undefined || path.length === 0) {continue}
     entries.push({
       path,
       head: headOf(lines),
@@ -144,10 +144,10 @@ export const parseAheadBehind = (
   const parts = output.trim().split(/\s+/)
   const behindRaw = parts[0]
   const aheadRaw = parts[1]
-  if (behindRaw === undefined || aheadRaw === undefined || parts.length !== 2) return Option.none()
+  if (behindRaw === undefined || aheadRaw === undefined || parts.length !== 2) {return Option.none()}
   const behind = Number(behindRaw)
   const ahead = Number(aheadRaw)
-  if (!Number.isInteger(behind) || !Number.isInteger(ahead) || behind < 0 || ahead < 0) return Option.none()
+  if (!Number.isInteger(behind) || !Number.isInteger(ahead) || behind < 0 || ahead < 0) {return Option.none()}
   return Option.some({ ahead, behind })
 }
 
@@ -272,7 +272,11 @@ export class Git extends Context.Service<Git, GitShape>()("zwt/Git") {
       const log = yield* DryRunLog
       const overlay = yield* Ref.make(new Map<string, string>())
       const remember = (args: ReadonlyArray<string>, cwd: string) => {
-        const scope = args[1] === "--worktree" ? "worktree" : args[1] === "--local" ? "local" : undefined
+        const scope = Match.value(args[1]).pipe(
+          Match.when("--worktree", () => "worktree" as const),
+          Match.when("--local", () => "local" as const),
+          Match.orElse(() => undefined)
+        )
         const key = args[2]
         const value = args[3]
         if (args[0] !== "config" || scope === undefined || key === undefined || value === undefined || key.startsWith("--")) {
@@ -286,14 +290,14 @@ export class Git extends Context.Service<Git, GitShape>()("zwt/Git") {
       }
       const recall = (args: ReadonlyArray<string>, cwd: string) =>
         Ref.get(overlay).pipe(Effect.map((map) => {
-          const key = args[args.length - 1]
-          if (key === undefined) return undefined
+          const key = args.at(-1)
+          if (key === undefined) {return undefined}
           if (args[1] === "--show-origin") {
             const value = map.get(`worktree\0${cwd}\0${key}`)
             return value === undefined ? undefined : `file:${cwd}/.git/config.worktree\t${value}`
           }
-          if (args[1] === "--local" && args[2] === "--get") return map.get(`local\0${cwd}\0${key}`)
-          if (args[1] === "--get") return map.get(`worktree\0${cwd}\0${key}`) ?? map.get(`local\0${cwd}\0${key}`)
+          if (args[1] === "--local" && args[2] === "--get") {return map.get(`local\0${cwd}\0${key}`)}
+          if (args[1] === "--get") {return map.get(`worktree\0${cwd}\0${key}`) ?? map.get(`local\0${cwd}\0${key}`)}
           return undefined
         }))
       return fromRunner(

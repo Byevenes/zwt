@@ -83,7 +83,7 @@ export const resolveIdentity = (options: {
     const email = flagIdentity !== undefined ? (flagEmail ?? named.email) : pick(flagEmail, project?.email, named.email)
     return { _tag: "Resolved", identity: { name: named.name, email: email ?? named.email } }
   }
-  if (flagEmail !== undefined) return { _tag: "Resolved", identity: { name: mailboxName(flagEmail), email: flagEmail } }
+  if (flagEmail !== undefined) {return { _tag: "Resolved", identity: { name: mailboxName(flagEmail), email: flagEmail } }}
   return { _tag: "Unresolved" }
 }
 
@@ -104,7 +104,7 @@ export const resolveIdentityKey = (options: {
   const { config, flags, home } = options
   const repoRoot = trimSlash(options.repoRoot)
   const flagIdentity = Option.getOrUndefined(flags.identity)
-  if (flagIdentity !== undefined) return config.identity[flagIdentity] === undefined ? undefined : flagIdentity
+  if (flagIdentity !== undefined) {return config.identity[flagIdentity] === undefined ? undefined : flagIdentity}
   const { profile, project } = matchesFor(config, repoRoot, home)
   const identityKey = pick(project?.identity, profile?.identity)
   return identityKey !== undefined && config.identity[identityKey] !== undefined ? identityKey : undefined
@@ -128,8 +128,8 @@ export const matchingRemote = (
 ): { readonly pattern: string; readonly identity: string } | undefined => {
   let best: { readonly pattern: string; readonly identity: string } | undefined
   for (const remote of remotes ?? []) {
-    if (remote.pattern.length === 0 || !origin.includes(remote.pattern)) continue
-    if (best === undefined || remote.pattern.length > best.pattern.length) best = remote
+    if (remote.pattern.length === 0 || !origin.includes(remote.pattern)) {continue}
+    if (best === undefined || remote.pattern.length > best.pattern.length) {best = remote}
   }
   return best
 }
@@ -146,16 +146,16 @@ export const remoteIdentityClash = (options: {
   readonly identityKey: string | undefined
   readonly email: string | undefined
 }): RemoteIdentityClash | undefined => {
-  if (options.origin === undefined) return undefined
+  if (options.origin === undefined) {return undefined}
   const match = matchingRemote(options.config.remote, options.origin)
-  if (match === undefined) return undefined
+  if (match === undefined) {return undefined}
   if (options.identityKey !== undefined) {
-    if (options.identityKey === match.identity) return undefined
+    if (options.identityKey === match.identity) {return undefined}
     return { pattern: match.pattern, required: match.identity, actual: options.identityKey }
   }
   if (options.email !== undefined) {
     const requiredEmail = options.config.identity[match.identity]?.email
-    if (requiredEmail === undefined || requiredEmail === options.email) return undefined
+    if (requiredEmail === undefined || requiredEmail === options.email) {return undefined}
     return { pattern: match.pattern, required: match.identity, actual: options.email }
   }
   return { pattern: match.pattern, required: match.identity, actual: "(unresolved)" }
@@ -212,9 +212,9 @@ export const compileTicketPattern = (pattern: string): RegExp | undefined => {
 
 const splitTicket = (slug: string, pattern: string): { readonly ticket: string; readonly rest: string } | undefined => {
   const compiled = compileTicketPattern(pattern)
-  if (compiled === undefined) return undefined
+  if (compiled === undefined) {return undefined}
   const match = compiled.exec(slug)
-  if (match === null || match[0].length === 0) return undefined
+  if (match === null || match[0].length === 0) {return undefined}
   return { ticket: match[0], rest: slug.slice(match[0].length).replace(/^[-_]/, "") }
 }
 
@@ -234,30 +234,30 @@ const fillTemplate = (
   let last = 0
   for (const match of template.matchAll(pattern)) {
     const index = match.index
-    if (index === undefined) continue
-    if (index > last) pieces.push({ _tag: "lit", text: template.slice(last, index) })
+    if (index === undefined) {continue}
+    if (index > last) {pieces.push({ _tag: "lit", text: template.slice(last, index) })}
     const name = match[1]
-    if (name === "ticket" || name === "slug" || name === "prefix") pieces.push({ _tag: "ph", name })
+    if (name === "ticket" || name === "slug" || name === "prefix") {pieces.push({ _tag: "ph", name })}
     last = index + match[0].length
   }
-  if (last < template.length) pieces.push({ _tag: "lit", text: template.slice(last) })
+  if (last < template.length) {pieces.push({ _tag: "lit", text: template.slice(last) })}
 
   const drop = new Set<number>()
   for (let i = 0; i < pieces.length; i++) {
     const piece = pieces[i]
-    if (piece === undefined || piece._tag !== "ph" || values[piece.name] !== "") continue
+    if (piece === undefined || piece._tag !== "ph" || values[piece.name] !== "") {continue}
     drop.add(i)
     const prev = pieces[i - 1]
     const next = pieces[i + 1]
-    if (prev?._tag === "lit" && isJoiner(prev.text)) drop.add(i - 1)
-    else if (next?._tag === "lit" && isJoiner(next.text)) drop.add(i + 1)
+    if (prev?._tag === "lit" && isJoiner(prev.text)) {drop.add(i - 1)}
+    else if (next?._tag === "lit" && isJoiner(next.text)) {drop.add(i + 1)}
   }
 
   let branch = ""
   for (let i = 0; i < pieces.length; i++) {
-    if (drop.has(i)) continue
+    if (drop.has(i)) {continue}
     const piece = pieces[i]
-    if (piece === undefined) continue
+    if (piece === undefined) {continue}
     branch += piece._tag === "lit" ? piece.text : values[piece.name]
   }
   return branch
@@ -270,14 +270,14 @@ const nameBranch = (options: {
   readonly pattern: string | undefined
 }): { readonly _tag: "Ready"; readonly branch: string } | BranchNameError => {
   const { pattern, prefix, slug, template } = options
-  if (template === undefined) return { _tag: "Ready", branch: `${prefix}${slug}` }
+  if (template === undefined) {return { _tag: "Ready", branch: `${prefix}${slug}` }}
   if (!template.includes("{ticket}")) {
     const branch = fillTemplate(template, { ticket: "", slug, prefix })
     return branch.length === 0 ? { _tag: "Empty" } : { _tag: "Ready", branch }
   }
-  if (pattern === undefined || pattern.length === 0) return { _tag: "TicketMissing", pattern: "" }
+  if (pattern === undefined || pattern.length === 0) {return { _tag: "TicketMissing", pattern: "" }}
   const split = splitTicket(slug, pattern)
-  if (split === undefined) return { _tag: "TicketMissing", pattern }
+  if (split === undefined) {return { _tag: "TicketMissing", pattern }}
   const branch = fillTemplate(template, { ticket: split.ticket, slug: split.rest, prefix })
   return branch.length === 0 ? { _tag: "Empty" } : { _tag: "Ready", branch }
 }
@@ -308,7 +308,7 @@ export const resolveLaunchCommand = (options: {
   readonly kind: LaunchKind
 }): string | undefined => {
   const profile = matchesFor(options.config, trimSlash(options.repoRoot), options.home).profile
-  if (profile === undefined) return undefined
+  if (profile === undefined) {return undefined}
   switch (options.kind) {
     case "open":
       return profile.open_command
@@ -376,14 +376,15 @@ export const resolveNew = (options: {
     pattern: profile?.ticket_pattern
   })
 
-  return {
+  const plan: NewPlan = {
     branch: named._tag === "Ready" ? named.branch : "",
-    ...(named._tag === "Ready" ? {} : { branchError: named }),
     base,
     worktreePath: resolveWorktreePath({ config, repoRoot, home, slug }),
     scratchDir: config.scratch_dir ?? defaults.scratch_dir,
     identity
   }
+  if (named._tag === "Ready") {return plan}
+  return { ...plan, branchError: named }
 }
 
 export const isValidSlug = (slug: string): boolean => /^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(slug) && !slug.includes("..")

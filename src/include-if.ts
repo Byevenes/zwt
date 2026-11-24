@@ -37,7 +37,7 @@ interface GitConfigView {
   readonly userEmail: string | undefined
 }
 
-const unescapeQuoted = (value: string) => value.replace(/\\(.)/g, (_match, char: string) => char)
+const unescapeQuoted = (value: string) => value.replaceAll(/\\(.)/g, (_match, char: string) => char)
 
 const stripComment = (line: string): string => {
   let quote: "'" | "\"" | undefined
@@ -48,22 +48,22 @@ const stripComment = (line: string): string => {
         i++
         continue
       }
-      if (char === quote) quote = undefined
+      if (char === quote) {quote = undefined}
       continue
     }
     if (char === "\"" || char === "'") {
       quote = char
       continue
     }
-    if (char === "#" || char === ";") return line.slice(0, i)
+    if (char === "#" || char === ";") {return line.slice(0, i)}
   }
   return line
 }
 
 const unquote = (raw: string): string => {
   const value = raw.trim()
-  if (value.length >= 2 && value.startsWith("\"") && value.endsWith("\"")) return unescapeQuoted(value.slice(1, -1))
-  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) return value.slice(1, -1)
+  if (value.length >= 2 && value.startsWith("\"") && value.endsWith("\"")) {return unescapeQuoted(value.slice(1, -1))}
+  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {return value.slice(1, -1)}
   return value
 }
 
@@ -74,7 +74,7 @@ const gitdirOf = (subsection: string): string | undefined => {
     : lower.startsWith("gitdir:")
       ? subsection.slice("gitdir:".length)
       : undefined
-  if (pattern === undefined) return undefined
+  if (pattern === undefined) {return undefined}
   const trimmed = pattern.trim()
   return trimmed.length === 0 ? undefined : trimmed
 }
@@ -89,7 +89,7 @@ const parseGitConfig = (source: string): GitConfigView => {
 
   for (const rawLine of source.split(/\r?\n/)) {
     const line = stripComment(rawLine).trim()
-    if (line.length === 0) continue
+    if (line.length === 0) {continue}
     const header = /^\[([A-Za-z0-9.-]+)(?:\s+"((?:\\.|[^"\\])*)")?\]$/.exec(line)
     if (header !== null) {
       section = (header[1] ?? "").toLowerCase()
@@ -97,19 +97,19 @@ const parseGitConfig = (source: string): GitConfigView => {
       continue
     }
     const assignment = /^([A-Za-z0-9-]+)\s*=\s*(.*)$/.exec(line)
-    if (assignment === null) continue
+    if (assignment === null) {continue}
     const key = (assignment[1] ?? "").toLowerCase()
     const value = unquote(assignment[2] ?? "")
-    if (value.length === 0) continue
+    if (value.length === 0) {continue}
     if (section === "user" && subsection === undefined) {
-      if (key === "name") userName = value
-      if (key === "email") userEmail = value
+      if (key === "name") {userName = value}
+      if (key === "email") {userEmail = value}
     }
-    if (key !== "path") continue
-    if (section === "include") includes.push({ path: value })
+    if (key !== "path") {continue}
+    if (section === "include") {includes.push({ path: value })}
     if (section === "includeif" && subsection !== undefined) {
       const gitdir = gitdirOf(subsection)
-      if (gitdir !== undefined) includeIfs.push({ gitdir, path: value })
+      if (gitdir !== undefined) {includeIfs.push({ gitdir, path: value })}
     }
   }
 
@@ -127,7 +127,7 @@ export const includePaths = (source: string, fromFile: string, home: string): Re
   return [...view.includes, ...view.includeIfs].map((entry) => resolveIncludePath(entry.path, fromFile, home))
 }
 
-const slug = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+const slug = (value: string): string => value.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-").replaceAll(/^-+|-+$/g, "")
 
 /**
  * Stable key for one imported identity.
@@ -141,7 +141,7 @@ export const identityKeyBase = (email: string, gitdir: string): string => {
   const at = email.indexOf("@")
   const local = at >= 0 ? email.slice(0, at) : email
   const fromEmail = slug(local)
-  if (fromEmail.length > 0) return fromEmail
+  if (fromEmail.length > 0) {return fromEmail}
   const segment = gitdir.split("/").filter((part) => part.length > 0 && part !== "~" && part !== "**").pop() ?? ""
   const fromPath = slug(segment)
   return fromPath.length > 0 ? fromPath : "identity"
@@ -150,8 +150,8 @@ export const identityKeyBase = (email: string, gitdir: string): string => {
 /** A gitdir becomes a profile match ending in `/**`. A trailing `/.git` maps to the work tree. See docs/adr/0002-identity-config-scope-and-gitdir-match.md. */
 export const gitdirToMatch = (gitdir: string): string => {
   const folder = gitdir.endsWith("/.git") ? gitdir.slice(0, -"/.git".length) : gitdir
-  if (folder.endsWith("/**")) return folder
-  if (folder.endsWith("/")) return `${folder}**`
+  if (folder.endsWith("/**")) {return folder}
+  if (folder.endsWith("/")) {return `${folder}**`}
   return `${folder}/**`
 }
 
@@ -184,18 +184,18 @@ export const importIdentities = (
 
   while (pending.length > 0) {
     const file = pending.shift()
-    if (file === undefined || seen.has(file)) continue
+    if (file === undefined || seen.has(file)) {continue}
     seen.add(file)
     const text = files.get(file)
-    if (text === undefined) continue
+    if (text === undefined) {continue}
     const view = parseGitConfig(text)
-    for (const path of includePaths(text, file, home)) pending.push(path)
+    for (const path of includePaths(text, file, home)) {pending.push(path)}
     for (const block of view.includeIfs) {
       const target = resolveIncludePath(block.path, file, home)
       const included = files.get(target)
-      if (included === undefined) continue
+      if (included === undefined) {continue}
       const identity = parseGitConfig(included)
-      if (identity.userEmail === undefined || !emailOk(identity.userEmail)) continue
+      if (identity.userEmail === undefined || !emailOk(identity.userEmail)) {continue}
       const at = identity.userEmail.indexOf("@")
       const fallback = at > 0 ? identity.userEmail.slice(0, at) : identity.userEmail
       found.push({
@@ -214,7 +214,7 @@ export const importIdentities = (
       groups.push({ email: item.email, name: item.name, gitdir: item.gitdir, matches: [item.match] })
       continue
     }
-    if (!group.matches.includes(item.match)) group.matches.push(item.match)
+    if (!group.matches.includes(item.match)) {group.matches.push(item.match)}
   }
 
   const used = new Set<string>()

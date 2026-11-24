@@ -284,11 +284,11 @@ export class InvalidSlug extends Data.TaggedError("InvalidSlug")<{
     return `invalid slug "${this.slug}": use letters, digits, ".", "_" or "-" (no "/" or leading ".")`
   }
   get fix() {
-    return `zwt new ${this.slug.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "my-task"}`
+    return `zwt new ${this.slug.replaceAll(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "my-task"}`
   }
 }
 
-export class PruneNeedsMerged extends Data.TaggedError("PruneNeedsMerged")<{}> {
+export class PruneNeedsMerged extends Data.TaggedError("PruneNeedsMerged") {
   override get message() {
     return "zwt prune removes nothing unless --merged is set"
   }

@@ -1,4 +1,5 @@
-import { spawnSync, type SpawnSyncReturns } from "node:child_process"
+import { spawnSync } from "node:child_process"
+import type { SpawnSyncReturns } from "node:child_process"
 import { createHash } from "node:crypto"
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -27,9 +28,9 @@ const packageVersion = (): string => {
 
 const parseTargets = (source: string) =>
   source.split("\n").flatMap((line) => {
-    if (line === "" || line.startsWith("#")) return []
+    if (line === "" || line.startsWith("#")) {return []}
     const parts = line.split("\t")
-    if (parts.length !== 4 || parts.some((part) => part === "")) throw new Error(`bad release target row: ${JSON.stringify(line)}`)
+    if (parts.length !== 4 || parts.some((part) => part === "")) {throw new Error(`bad release target row: ${JSON.stringify(line)}`)}
     const [target, asset, os, arch] = parts
     return [{ target, asset, os, arch }]
   })
@@ -51,7 +52,7 @@ const expectOk = (result: SpawnSyncReturns<string>) => {
 }
 
 const fillAssets = (dir: string) => {
-  for (const row of releaseTargets) writeFileSync(join(dir, row.asset), `bytes ${row.asset}\n`)
+  for (const row of releaseTargets) {writeFileSync(join(dir, row.asset), `bytes ${row.asset}\n`)}
 }
 
 describe("release packaging", () => {
@@ -72,7 +73,7 @@ describe("release packaging", () => {
     const result = run(["build", "--dry-run", out], { PATH: "/usr/bin:/bin" })
     expectOk(result)
     expect(existsSync(out)).toBe(false)
-    for (const row of releaseTargets) expect(result.stdout).toContain(`would build ${row.target} -> ${out}/${row.asset}`)
+    for (const row of releaseTargets) {expect(result.stdout).toContain(`would build ${row.target} -> ${out}/${row.asset}`)}
   })
 
   it("build invokes bun --compile for each target", () => {
@@ -171,7 +172,7 @@ printf 'built %s\\n' "$outfile" > "$outfile"
       const result = run(["publish", "--dry-run", dir], extra)
       expectOk(result)
       expect(result.stdout).toContain(`would publish v${version}`)
-      for (const row of releaseTargets) expect(result.stdout).toContain(`would upload ${row.asset}`)
+      for (const row of releaseTargets) {expect(result.stdout).toContain(`would upload ${row.asset}`)}
       expect(result.stdout).toContain("would upload checksums.txt")
       expect(existsSync(ghLog)).toBe(false)
 
@@ -206,6 +207,6 @@ printf 'built %s\\n' "$outfile" > "$outfile"
     expect(workflow).not.toContain("pull_request")
     expect(readme).toContain("https://raw.githubusercontent.com/Byevenes/zwt/main/install.sh")
     expect(readme).toContain(`--version v${packageVersion()}`)
-    for (const row of releaseTargets) expect(readme).toContain(row.asset)
+    for (const row of releaseTargets) {expect(readme).toContain(row.asset)}
   })
 })

@@ -1,9 +1,11 @@
 import { resolve as resolvePath } from "node:path"
 import { Console, Effect, Option } from "effect"
 import { ConfirmationRequired, IdentityMismatch, IdentityUnresolved, UnknownIdentity } from "../errors.ts"
-import { expandHome, resolveIdentity, type Identity } from "../resolve.ts"
+import { expandHome, resolveIdentity } from "../resolve.ts"
+import type { Identity } from "../resolve.ts"
 import { Config } from "../services/Config.ts"
-import { Git, type GitShape } from "../services/Git.ts"
+import { Git } from "../services/Git.ts"
+import type { GitShape } from "../services/Git.ts"
 import { canPrompt, Prompt } from "../services/Prompt.ts"
 
 const trimSlash = (path: string) => path.replace(/\/+$/, "")
@@ -70,7 +72,7 @@ export const setIdentity = (options: {
     const { configFile, cwd, home, interactive, name } = options
     const config = yield* Config
     const loaded = yield* config.load(configFile)
-    if (loaded.identity[name] === undefined) return yield* new UnknownIdentity({ name, file: configFile })
+    if (loaded.identity[name] === undefined) {return yield* new UnknownIdentity({ name, file: configFile })}
     const start = Option.isSome(options.path) ? normalizeFolder(options.path.value, cwd, home) : cwd
     const path = trimSlash(yield* (yield* Git).repoRoot(start).pipe(
       Effect.catchIf(
@@ -78,9 +80,9 @@ export const setIdentity = (options: {
         () => Effect.succeed(start)
       )
     ))
-    if (!interactive) return yield* new ConfirmationRequired({ action: "identity set" })
+    if (!interactive) {return yield* new ConfirmationRequired({ action: "identity set" })}
     const save = yield* (yield* Prompt).confirm(`Save identity "${name}" for ${path}?`)
-    if (!save) return { _tag: "Declined", path, identity: name } satisfies SetResult
+    if (!save) {return { _tag: "Declined", path, identity: name } satisfies SetResult}
     yield* config.upsertProject(configFile, { path, identity: name, home })
     return { _tag: "Saved", path, identity: name } satisfies SetResult
   })

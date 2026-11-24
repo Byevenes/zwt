@@ -14,12 +14,11 @@ import {
   isValidSlug,
   remoteIdentityClash,
   resolveIdentityKey,
-  resolveNew,
-  type BranchNameError,
-  type Identity,
-  type NewFlags
+  resolveNew
 } from "../resolve.ts"
-import { Config, type ZwtConfig } from "../services/Config.ts"
+import type { BranchNameError, Identity, NewFlags } from "../resolve.ts"
+import { Config } from "../services/Config.ts"
+import type { ZwtConfig } from "../services/Config.ts"
 import { Git } from "../services/Git.ts"
 import { Prompt } from "../services/Prompt.ts"
 
@@ -36,13 +35,10 @@ const ensureScratchExcluded = (repoRoot: string, pattern: string) =>
     const file = excludeFile(repoRoot, located)
     const fs = yield* FileSystem.FileSystem
     const current = yield* fs.readFileString(file).pipe(
-      Effect.catchIf(
-        (error) => error.reason._tag === "NotFound",
-        () => Effect.succeed("")
-      )
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(""))
     )
     const next = appendExcludeLine(current, pattern)
-    if (next === undefined) return
+    if (next === undefined) {return}
     yield* fs.writeFileString(file, next)
   })
 
@@ -64,9 +60,9 @@ const chooseIdentity = (options: {
     }
     const chosen = yield* (yield* Prompt).select("Git identity for this folder", names)
     const named = lookup(chosen)
-    if (named === undefined) return yield* new UnknownIdentity({ name: chosen, file: configFile })
+    if (named === undefined) {return yield* new UnknownIdentity({ name: chosen, file: configFile })}
     const save = yield* (yield* Prompt).confirm(`Save identity "${chosen}" for ${repoRoot}?`)
-    if (save) yield* (yield* Config).upsertProject(configFile, { path: repoRoot, identity: chosen, home })
+    if (save) {yield* (yield* Config).upsertProject(configFile, { path: repoRoot, identity: chosen, home })}
     return { identity: named, key: chosen }
   })
 
@@ -78,16 +74,16 @@ const enforceRemoteIdentity = (options: {
   readonly strict: boolean
 }) =>
   Effect.gen(function*() {
-    if ((options.config.remote?.length ?? 0) === 0) return
+    if ((options.config.remote?.length ?? 0) === 0) {return}
     const origin = Option.getOrUndefined(yield* (yield* Git).originUrl(options.repoRoot))
-    if (origin === undefined) return
+    if (origin === undefined) {return}
     const clash = remoteIdentityClash({
       config: options.config,
       origin,
       identityKey: options.identityKey,
       email: options.email
     })
-    if (clash === undefined) return
+    if (clash === undefined) {return}
     const error = new RemoteIdentityMismatch({
       repo: options.repoRoot,
       origin,
@@ -95,7 +91,7 @@ const enforceRemoteIdentity = (options: {
       required: clash.required,
       actual: clash.actual
     })
-    if (options.strict) return yield* error
+    if (options.strict) {return yield* error}
     yield* Console.error(`warning: ${error.message}\n  fix: ${error.fix}`)
   })
 
@@ -124,13 +120,13 @@ export const newWorktree = (options: {
 }) =>
   Effect.gen(function*() {
     const { configFile, cwd, flags, home, interactive, slug, strict } = options
-    if (!isValidSlug(slug)) return yield* new InvalidSlug({ slug })
+    if (!isValidSlug(slug)) {return yield* new InvalidSlug({ slug })}
     const git = yield* Git
     const loaded = yield* (yield* Config).load(configFile)
     const repoRoot = yield* git.repoRoot(cwd)
     const plan = resolveNew({ config: loaded, repoRoot, slug, home, flags })
-    if (plan.identity._tag === "Unknown") return yield* new UnknownIdentity({ name: plan.identity.name, file: configFile })
-    if (plan.branchError !== undefined) return yield* rejectBranchName(slug, plan.branchError)
+    if (plan.identity._tag === "Unknown") {return yield* new UnknownIdentity({ name: plan.identity.name, file: configFile })}
+    if (plan.branchError !== undefined) {return yield* rejectBranchName(slug, plan.branchError)}
 
     const existing = yield* git.worktreeForBranch(plan.branch, repoRoot)
     if (Option.isSome(existing)) {
@@ -167,7 +163,7 @@ export const newWorktree = (options: {
       yield* git.fetch("origin", plan.base, repoRoot).pipe(
         Effect.catch((error) => Console.error(`warning: could not fetch origin ${plan.base}, using local refs (${error.stderr.trim()})`))
       )
-      if (yield* git.refExists(`refs/remotes/origin/${plan.base}`, repoRoot)) base = `origin/${plan.base}`
+      if (yield* git.refExists(`refs/remotes/origin/${plan.base}`, repoRoot)) {base = `origin/${plan.base}`}
     }
     if (base === plan.base && !(yield* git.refExists(plan.base, repoRoot))) {
       return yield* new BranchNotFound({ branch: plan.base, repo: repoRoot })

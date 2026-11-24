@@ -5,9 +5,9 @@ import {
   importIdentities,
   includePaths,
   renderZwtToml,
-  starterDrafts,
-  type IdentityDraft
+  starterDrafts
 } from "../include-if.ts"
+import type { IdentityDraft } from "../include-if.ts"
 import { parseConfig } from "../services/Config.ts"
 import { Prompt } from "../services/Prompt.ts"
 
@@ -21,10 +21,7 @@ const readOptional = (path: string) =>
     const fs = yield* FileSystem.FileSystem
     return yield* fs.readFileString(path).pipe(
       Effect.map(Option.some),
-      Effect.catchIf(
-        (error) => error.reason._tag === "NotFound",
-        () => Effect.succeed(Option.none<string>())
-      )
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(Option.none<string>()))
     )
   })
 
@@ -35,12 +32,12 @@ const loadGitConfigs = (roots: ReadonlyArray<string>, home: string) =>
     const seen = new Set<string>()
     while (pending.length > 0) {
       const file = pending.shift()
-      if (file === undefined || seen.has(file)) continue
+      if (file === undefined || seen.has(file)) {continue}
       seen.add(file)
       const text = yield* readOptional(file)
-      if (Option.isNone(text)) continue
+      if (Option.isNone(text)) {continue}
       files.set(file, text.value)
-      for (const path of includePaths(text.value, file, home)) pending.push(path)
+      for (const path of includePaths(text.value, file, home)) {pending.push(path)}
     }
     return files
   })
@@ -62,7 +59,7 @@ export const initConfig = (options: {
     const existing = yield* readOptional(file)
     if (Option.isSome(existing) && !yes) {
       const overwrite = interactive ? yield* (yield* Prompt).confirm(`Overwrite ${file}?`) : false
-      if (!overwrite) return yield* new OverwriteRefused({ file })
+      if (!overwrite) {return yield* new OverwriteRefused({ file })}
     }
 
     const roots = globalGitConfigCandidates(home, xdgConfigHome)
@@ -74,13 +71,13 @@ export const initConfig = (options: {
         ? `Import ${count} includeIf ${count === 1 ? "identity" : "identities"} into ${file}?`
         : `No includeIf identities found. Write a starter config to ${file}?`
       const accepted = yield* (yield* Prompt).confirm(message)
-      if (!accepted) return { _tag: "Declined", file } satisfies InitResult
+      if (!accepted) {return { _tag: "Declined", file } satisfies InitResult}
     }
 
     const source = renderZwtToml(chosen.drafts)
     yield* parseConfig(file, source)
     const slash = file.lastIndexOf("/")
-    if (slash > 0) yield* fs.makeDirectory(file.slice(0, slash), { recursive: true })
+    if (slash > 0) {yield* fs.makeDirectory(file.slice(0, slash), { recursive: true })}
     yield* fs.writeFileString(file, source)
     return chosen.imported
       ? { _tag: "Imported", file, count: chosen.drafts.length } satisfies InitResult

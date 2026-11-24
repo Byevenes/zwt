@@ -21,8 +21,8 @@ export const actionResult = (error: unknown): string => {
   const message = typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
     ? error.message
     : ""
-  const flat = message.replace(/\s+/g, " ").trim()
-  if (flat.length === 0) return "error"
+  const flat = message.replaceAll(/\s+/g, " ").trim()
+  if (flat.length === 0) {return "error"}
   const clipped = flat.length > maxResultLength ? `${flat.slice(0, maxResultLength)}...` : flat
   return `error: ${clipped}`
 }
@@ -31,19 +31,19 @@ export const encodeEntry = (entry: ActionEntry): string =>
   JSON.stringify({ timestamp: entry.timestamp, command: entry.command, result: entry.result })
 
 const isEntry = (value: unknown): value is ActionEntry => {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false
-  const entry = value as Record<string, unknown>
-  return typeof entry.timestamp === "string" && typeof entry.command === "string" && typeof entry.result === "string"
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {return false}
+  if (!("timestamp" in value) || !("command" in value) || !("result" in value)) {return false}
+  return typeof value.timestamp === "string" && typeof value.command === "string" && typeof value.result === "string"
 }
 
 /** Keeps well-formed lines. A bad line does not hide the rest of the file. */
 export const parseActionLog = (source: string): ReadonlyArray<ActionEntry> => {
   const entries: Array<ActionEntry> = []
   for (const line of source.split("\n")) {
-    if (line.trim() === "") continue
+    if (line.trim() === "") {continue}
     try {
       const value: unknown = JSON.parse(line)
-      if (!isEntry(value)) continue
+      if (!isEntry(value)) {continue}
       entries.push({ timestamp: value.timestamp, command: value.command, result: value.result })
     } catch {
       continue
@@ -59,6 +59,6 @@ export const renderActionLog = (entries: ReadonlyArray<ActionEntry>): string =>
 export const appendCapped = (existing: string, entry: ActionEntry, maxBytes: number): string => {
   const lines = existing.split("\n").filter((line) => line.length > 0)
   lines.push(encodeEntry(entry))
-  while (lines.length > 1 && bytes(`${lines.join("\n")}\n`) > maxBytes) lines.shift()
+  while (lines.length > 1 && bytes(`${lines.join("\n")}\n`) > maxBytes) {lines.shift()}
   return `${lines.join("\n")}\n`
 }

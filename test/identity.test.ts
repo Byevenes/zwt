@@ -62,7 +62,7 @@ describe("zwt identity", () => {
         configFile: "/cfg/zwt.toml"
       }))
       expect(error._tag).toBe("IdentityMismatch")
-      if (error._tag === "IdentityMismatch") expect(error.fix).toContain("includeIf")
+      if (error._tag === "IdentityMismatch") {expect(error.fix).toContain("includeIf")}
       const logs = yield* TestConsole.logLines
       expect(String(logs[0])).toContain("effective: other@example.com")
       expect(String(logs[0])).toContain("expected: jane.doe@example.com")
@@ -81,7 +81,7 @@ describe("zwt identity", () => {
         interactive: false
       }))
       expect(error._tag).toBe("ConfirmationRequired")
-      if (error._tag === "ConfirmationRequired") expect(error.fix).toContain("non-interactive")
+      if (error._tag === "ConfirmationRequired") {expect(error.fix).toContain("non-interactive")}
     }).pipe(Effect.provide(Layer.mergeAll(fake.layer, configLayer, Prompt.scripted({ confirm: true }))))
   })
 
@@ -128,7 +128,7 @@ describe("zwt identity", () => {
   })
 
   it.effect("set --dry-run records the toml write and leaves the file untouched", () => {
-    let text = source
+    const text = source
     const backing = FileSystem.layerNoop({
       readFileString: () => Effect.succeed(text),
       writeFileString: () => Effect.die("real write during dry-run")

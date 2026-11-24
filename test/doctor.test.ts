@@ -4,9 +4,11 @@ import { Effect, FileSystem, Layer, Option } from "effect"
 import { TestConsole } from "effect/testing"
 import { runDoctor } from "../src/commands/doctor.ts"
 import { GitCommandFailed } from "../src/errors.ts"
-import { Config, type ZwtConfig } from "../src/services/Config.ts"
+import { Config } from "../src/services/Config.ts"
+import type { ZwtConfig } from "../src/services/Config.ts"
 import { DryRunLog } from "../src/services/DryRun.ts"
 import { Git } from "../src/services/Git.ts"
+import { doctorRepo, doctorRepos } from "./doctor-json.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
 const configLayer = Config.live.pipe(
@@ -197,13 +199,7 @@ describe("zwt doctor", () => {
     return Effect.gen(function*() {
       const error = yield* Effect.flip(doctor({ output: "json" }))
       expect(error._tag).toBe("DoctorFailed")
-      const parsed = JSON.parse(logged(yield* TestConsole.logLines)) as {
-        readonly repo: string
-        readonly currentEmail: string
-        readonly expectedEmail: string
-        readonly status: string
-        readonly checks: ReadonlyArray<{ readonly name: string; readonly status: string; readonly fix?: string }>
-      }
+      const parsed = doctorRepo(logged(yield* TestConsole.logLines))
       expect(parsed.repo).toBe(repo)
       expect(parsed.currentEmail).toBe("other@example.com")
       expect(parsed.expectedEmail).toBe("jane.doe@example.com")
@@ -342,7 +338,7 @@ describe("zwt doctor --all", () => {
     return Effect.gen(function*() {
       const error = yield* Effect.flip(doctor({ all: true, path: Option.some("/home/jane/ignored"), cwd: "/home/jane/ignored" }))
       expect(error._tag).toBe("DoctorFailed")
-      if (error._tag === "DoctorFailed") expect(error.fix).toContain(`edit ${configFile}`)
+      if (error._tag === "DoctorFailed") {expect(error.fix).toContain(`edit ${configFile}`)}
       const text = logged(yield* TestConsole.logLines)
       expect(text.startsWith("repo | current email | expected email | status\n")).toBe(true)
       const rows = text.split("\n").filter((line) => line.startsWith("/")).map((line) => line.split(" | ")[0])
@@ -369,13 +365,7 @@ describe("zwt doctor --all", () => {
     const fake = Git.fake(allResponses)
     return Effect.gen(function*() {
       yield* Effect.flip(doctor({ all: true, output: "json" }))
-      const parsed = JSON.parse(logged(yield* TestConsole.logLines)) as {
-        readonly repos: ReadonlyArray<{
-          readonly repo: string
-          readonly status: string
-          readonly checks: ReadonlyArray<{ readonly name: string; readonly fix?: string }>
-        }>
-      }
+      const parsed = { repos: doctorRepos(logged(yield* TestConsole.logLines)) }
       expect(parsed.repos.map((row) => row.repo)).toEqual([
         "/home/jane/repo",
         "/home/jane/missing",
@@ -438,12 +428,7 @@ describe("zwt doctor --all", () => {
     })
     return Effect.gen(function*() {
       yield* Effect.flip(doctor({ all: true, output: "json" }))
-      const parsed = JSON.parse(logged(yield* TestConsole.logLines)) as {
-        readonly repos: ReadonlyArray<{
-          readonly status: string
-          readonly checks: ReadonlyArray<{ readonly name: string; readonly status: string; readonly fix?: string }>
-        }>
-      }
+      const parsed = { repos: doctorRepos(logged(yield* TestConsole.logLines)) }
       expect(parsed.repos[0]?.status).toBe("fail")
       const check = parsed.repos[0]?.checks.find((item) => item.name === "remote_identity")
       expect(check?.status).toBe("fail")

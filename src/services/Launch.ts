@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
 import { Context, Console, Effect, Layer } from "effect"
-import { CommandFailed, CommandNotFound, type LaunchCommandKey } from "../errors.ts"
+import { CommandFailed, CommandNotFound } from "../errors.ts"
+import type { LaunchCommandKey } from "../errors.ts"
 import { DryRunLog } from "./DryRun.ts"
 
 export interface LaunchRequest {
@@ -12,7 +13,7 @@ export interface LaunchRequest {
 }
 
 const codeOf = (error: unknown): string | number | undefined => {
-  if (typeof error !== "object" || error === null || !("code" in error)) return undefined
+  if (typeof error !== "object" || error === null || !("code" in error)) {return undefined}
   const code = error.code
   return typeof code === "string" || typeof code === "number" ? code : undefined
 }
@@ -28,7 +29,7 @@ const exec = (request: LaunchRequest) =>
     const child = spawn(bin, args, { cwd: request.cwd, stdio: "inherit" })
     let settled = false
     const finish = (result: Effect.Effect<void, CommandNotFound | CommandFailed>) => {
-      if (settled) return
+      if (settled) {return}
       settled = true
       resume(result)
     }

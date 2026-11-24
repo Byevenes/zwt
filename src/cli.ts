@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Option } from "effect"
+import { Console, Effect, Layer, Match, Option } from "effect"
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli"
 import pkg from "../package.json" with { type: "json" }
 import { runDoctor } from "./commands/doctor.ts"
@@ -7,10 +7,11 @@ import { initConfig } from "./commands/init.ts"
 import { finishOpen, launchInWorktree, prepareOpen } from "./commands/launch.ts"
 import { showLog } from "./commands/log.ts"
 import { newWorktree } from "./commands/new.ts"
-import { type LaunchKind } from "./resolve.ts"
+import type { LaunchKind } from "./resolve.ts"
 import { runStatus } from "./commands/status.ts"
 import { renderSyncTable, syncFailure, syncRepos } from "./commands/sync.ts"
-import { listWorktrees, pruneMerged, removeWorktreeBySlug, renderList, renderPrune, renderRemoval, type RemovalVerbs } from "./commands/worktrees.ts"
+import { listWorktrees, pruneMerged, removeWorktreeBySlug, renderList, renderPrune, renderRemoval } from "./commands/worktrees.ts"
+import type { RemovalVerbs } from "./commands/worktrees.ts"
 import { ActionLog } from "./services/ActionLog.ts"
 import { Config, defaultConfigPath } from "./services/Config.ts"
 import { DryRunLog, renderPlan } from "./services/DryRun.ts"
@@ -128,7 +129,7 @@ const newCommand = Command.make(
       const cwd = process.cwd()
       const home = process.env.HOME ?? "~"
       const file = configFile(config)
-      if (open) yield* prepareOpen({ slug, cwd, home, configFile: file })
+      if (open) {yield* prepareOpen({ slug, cwd, home, configFile: file })}
       const result = yield* newWorktree({
         slug,
         cwd,
@@ -143,7 +144,7 @@ const newCommand = Command.make(
           ? `exists ${result.path} (branch ${result.branch})`
           : `${(yield* DryRun) ? "would create" : "created"} ${result.path}\n  branch ${result.branch} from ${result.base}, identity ${result.email}`
       )
-      if (!open) return
+      if (!open) {return}
       yield* finishOpen({ cwd, home, configFile: file, worktreePath: result.path })
       yield* Console.log(`${launchVerb("open", yield* DryRun)} ${result.path}`)
     }).pipe(reportPlan)
@@ -253,7 +254,7 @@ const syncCommand = Command.make("sync", { config: configFlag }, ({ config }) =>
       return found
     }).pipe(reportPlan)
     const failure = syncFailure(rows)
-    if (failure !== undefined) return yield* failure
+    if (failure !== undefined) {return yield* failure}
   })).pipe(
   Command.withDescription("fetch and fast-forward the base branch of every configured repo"),
   Command.provide(services)
@@ -377,11 +378,11 @@ const initCommand = Command.make(
         interactive: interactiveSession()
       })
       const verb = (yield* DryRun) ? "would write" : "wrote"
-      const line = result._tag === "Declined"
-        ? `not written ${result.file}`
-        : result._tag === "Imported"
-          ? `${verb} ${result.file} (${result.count} ${result.count === 1 ? "identity" : "identities"})`
-          : `${verb} starter ${result.file}`
+      const line = Match.valueTags(result, {
+        Declined: ({ file }) => `not written ${file}`,
+        Imported: ({ file, count }) => `${verb} ${file} (${count} ${count === 1 ? "identity" : "identities"})`,
+        Starter: ({ file }) => `${verb} starter ${file}`
+      })
       yield* Console.log(line)
     }).pipe(reportPlan)
 ).pipe(
@@ -403,7 +404,7 @@ export const walkUserCommands = (root: Command.Command.Any): ReadonlyArray<UserC
   const walk = (current: Command.Command.Any, prefix: string): ReadonlyArray<UserCommand> =>
     current.subcommands.flatMap((group) =>
       group.commands.flatMap((child) => {
-        if (child.unlisted) return []
+        if (child.unlisted) {return []}
         const command = prefix.length === 0 ? child.name : `${prefix} ${child.name}`
         return [{ command, description: child.description ?? "" }, ...walk(child, command)]
       })

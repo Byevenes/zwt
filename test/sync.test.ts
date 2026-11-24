@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { GitCommandFailed } from "../src/errors.ts"
-import { isBlocking, renderSyncTable, syncFailure, syncRepos, syncStatuses, type SyncStatus } from "../src/commands/sync.ts"
-import { Config, type ZwtConfig } from "../src/services/Config.ts"
+import { isBlocking, renderSyncTable, syncFailure, syncRepos, syncStatuses } from "../src/commands/sync.ts"
+import type { SyncStatus } from "../src/commands/sync.ts"
+import { Config } from "../src/services/Config.ts"
+import type { ZwtConfig } from "../src/services/Config.ts"
 import { Git } from "../src/services/Git.ts"
 
 const home = "/home/jane"
@@ -13,6 +15,8 @@ const local = "a".repeat(40)
 const remote = "b".repeat(40)
 const failed = (args: ReadonlyArray<string>, exitCode = 1, stderr = "") =>
   new GitCommandFailed({ args, exitCode, stderr })
+
+const key = (cwd: string, args: string) => `${cwd}\0${args}`
 
 const work = { name: "Jane Doe", email: "jane.doe@example.com" }
 
@@ -38,7 +42,7 @@ const projectConfig = (extra?: Partial<ZwtConfig>): ZwtConfig => ({
 
 const ancestorArgs = (ancestor: string, descendant: string) => ["merge-base", "--is-ancestor", ancestor, descendant]
 
-const behind = (branch = "feature"): Record<string, string | GitCommandFailed> => ({
+const behind = (branch = "feature") => ({
   "rev-parse --show-toplevel": repo,
   "remote": "origin",
   "fetch --quiet origin main": "",
@@ -46,7 +50,7 @@ const behind = (branch = "feature"): Record<string, string | GitCommandFailed> =
   "rev-parse --verify --quiet refs/heads/main^{commit}": local,
   [ancestorArgs(local, remote).join(" ")]: "",
   "worktree list --porcelain": porcelain(repo, branch)
-})
+} satisfies Record<string, string | GitCommandFailed>)
 
 const writes = (calls: ReadonlyArray<ReadonlyArray<string>>) =>
   calls.some((call) =>
@@ -256,7 +260,6 @@ describe("zwt sync", () => {
   it.effect("continues after a fetch failure and still fast-forwards the next repo", () => {
     const first = "/repos/a"
     const second = "/repos/b"
-    const key = (cwd: string, args: string) => `${cwd}\0${args}`
     const fetchArgs = ["fetch", "--quiet", "origin", "main"]
     const fake = Git.fake({
       [key(first, "rev-parse --show-toplevel")]: first,
@@ -290,7 +293,6 @@ describe("zwt sync", () => {
     const solo = "/home/jane/solo"
     const missing = "/home/jane/missing"
     const notRepo = failed(["rev-parse", "--show-toplevel"], 128, "fatal: not a git repository")
-    const key = (cwd: string, args: string) => `${cwd}\0${args}`
     const fake = Git.fake({
       [key(repo, "rev-parse --show-toplevel")]: repo,
       [key("/home/jane/work/acme", "rev-parse --show-toplevel")]: notRepo,

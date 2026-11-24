@@ -1,7 +1,8 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { Context, Effect, Layer } from "effect"
-import { actionLogPath, appendCapped, maxActionLogBytes, parseActionLog, type ActionEntry } from "../action-log.ts"
+import { actionLogPath, appendCapped, maxActionLogBytes, parseActionLog } from "../action-log.ts"
+import type { ActionEntry } from "../action-log.ts"
 import { ActionLogUnreadable } from "../errors.ts"
 
 let tmpSeq = 0
@@ -11,8 +12,8 @@ const isEnoent = (error: unknown): boolean =>
 
 const errorDetail = (error: unknown): string => {
   if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
-    const flat = error.message.replace(/\s+/g, " ").trim()
-    if (flat.length > 0) return flat
+    const flat = error.message.replaceAll(/\s+/g, " ").trim()
+    if (flat.length > 0) {return flat}
   }
   return "unknown error"
 }

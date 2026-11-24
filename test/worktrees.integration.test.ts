@@ -8,7 +8,7 @@ const entry = new URL("../src/main.ts", import.meta.url).pathname
 const roots: Array<string> = []
 
 afterAll(() => {
-  for (const root of roots) rmSync(root, { recursive: true, force: true })
+  for (const root of roots) {rmSync(root, { recursive: true, force: true })}
 })
 
 const makeRepo = (base = "main") => {
@@ -45,8 +45,8 @@ const makeRepo = (base = "main") => {
   const add = (slug: string, kind: "merged" | "ahead" | "dirty") => {
     const path = join(home, "work", "acme", "worktrees", "web", slug)
     git(repo, "worktree", "add", "-q", "-b", `feature/${slug}`, path, "main")
-    if (kind === "ahead") git(path, "commit", "-q", "--allow-empty", "-m", slug)
-    if (kind === "dirty") writeFileSync(join(path, "notes.txt"), "wip\n")
+    if (kind === "ahead") {git(path, "commit", "-q", "--allow-empty", "-m", slug)}
+    if (kind === "dirty") {writeFileSync(join(path, "notes.txt"), "wip\n")}
     return path
   }
   return { configFile, git, repo, zwt, add }

@@ -321,7 +321,7 @@ describe("zwt new with a fake Git layer", () => {
     return Effect.gen(function*() {
       const error = yield* Effect.flip(newWorktree({ ...options(), strict: true }))
       expect(error._tag).toBe("RemoteIdentityMismatch")
-      if (error._tag === "RemoteIdentityMismatch") expect(error.fix).toBe(`zwt identity set external ${repo}`)
+      if (error._tag === "RemoteIdentityMismatch") {expect(error.fix).toBe(`zwt identity set external ${repo}`)}
       expect(fake.calls.some((call) => call[0] === "fetch" || (call[0] === "worktree" && call[1] === "add"))).toBe(false)
     }).pipe(Effect.provide(withRemote(fake)))
   })

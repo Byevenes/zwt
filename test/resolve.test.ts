@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
 import { expandHome, formatLaunch, isValidSlug, launchArgv, matchingRemote, profileRoot, remoteIdentityClash, resolveBase, resolveExpectRemote, resolveIdentityKey, resolveLaunchCommand, resolveNew, resolvePrefix, resolveWorktreePath } from "../src/resolve.ts"
-import { parseConfig, type ZwtConfig } from "../src/services/Config.ts"
+import { parseConfig } from "../src/services/Config.ts"
+import type { ZwtConfig } from "../src/services/Config.ts"
 
 const source = readFileSync(new URL("./fixtures/valid.toml", import.meta.url), "utf8")
 const none = {
@@ -23,7 +24,7 @@ describe("paths", () => {
 
   it("accepts plain slugs only", () => {
     expect(isValidSlug("fix-login_2.1")).toBe(true)
-    for (const bad of ["", "a/b", "../x", ".hidden", "a b", "a..b"]) expect(isValidSlug(bad)).toBe(false)
+    for (const bad of ["", "a/b", "../x", ".hidden", "a b", "a..b"]) {expect(isValidSlug(bad)).toBe(false)}
   })
 })
 
@@ -287,6 +288,16 @@ describe("branch template", () => {
       expect(described.branch).toBe("ABC-123/fix-login")
       const keyOnly = resolveNew({ config, repoRoot, slug: "ABC-123", home, flags: none })
       expect(keyOnly.branch).toBe("ABC-123")
+    }))
+
+  it.effect("keeps a literal that is not a single joiner next to an empty placeholder", () =>
+    Effect.gen(function*() {
+      const config = yield* parseConfig(
+        "t.toml",
+        ticketToml('ticket_pattern = "[A-Z][A-Z0-9]+-[0-9]+"\nbranch_template = "{ticket}+{slug}"')
+      )
+      const keyOnly = resolveNew({ config, repoRoot, slug: "ABC-123", home, flags: none })
+      expect(keyOnly.branch).toBe("ABC-123+")
     }))
 
   it.effect("--prefix skips the template and keeps the whole slug", () =>
