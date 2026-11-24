@@ -51,7 +51,7 @@ const service = (file: string, maxBytes: number) => ({
         }, maxBytes))
       ),
       Effect.catch((error: unknown) =>
-        // stderr, not the caller's error channel: a log failure must not replace a git or file error.
+        /** stderr, not the caller's error channel: a log failure must not replace a git or file error. */
         Effect.sync(() => {
           process.stderr.write(`warning: could not write action log ${file}: ${errorDetail(error)}\n`)
         })

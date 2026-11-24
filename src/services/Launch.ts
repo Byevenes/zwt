@@ -25,7 +25,7 @@ const exec = (request: LaunchRequest) =>
       resume(Effect.fail(new CommandNotFound({ command: "(empty)", key: request.key, file: request.file })))
       return
     }
-    // spawn never invokes a shell. The editor or agent inherits the terminal.
+    /** spawn never invokes a shell. The editor or agent inherits the terminal. */
     const child = spawn(bin, args, { cwd: request.cwd, stdio: "inherit" })
     let settled = false
     const finish = (result: Effect.Effect<void, CommandNotFound | CommandFailed>) => {
